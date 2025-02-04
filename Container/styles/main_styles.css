@@ -1,0 +1,114 @@
+/* General Styles */
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+/* Container Styling */
+.container {
+  background: white;
+  padding: 30px;
+  border-radius: 12px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  text-align: center;
+  width: 90%;
+  max-width: 500px;
+}
+
+/* Navigation Bar */
+.up-bar {
+  background: linear-gradient(45deg, #ff6b6b, #556270);
+  padding: 15px;
+  display: flex;
+  justify-content: space-around;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  margin-bottom: 20px;
+}
+
+.up-bar a {
+  text-decoration: none;
+  color: white;
+  font-weight: bold;
+  font-size: 18px;
+  transition: all 0.3s ease-in-out;
+}
+
+.up-bar a:hover {
+  color: #ffeb3b;
+  transform: scale(1.1);
+}
+
+/* Quiz Styling */
+#quiz {
+  text-align: left;
+}
+
+.question {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 15px 0;
+}
+
+.answers label {
+  display: block;
+  font-size: 16px;
+  margin: 5px 0;
+  padding: 5px;
+  background: #f0f0f0;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.answers label:hover {
+  background: #ddd;
+}
+
+/* Submit Button */
+button {
+  padding: 12px 25px;
+  font-size: 18px;
+  margin-top: 20px;
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+  background: #ff6b6b;
+  color: white;
+  font-weight: bold;
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: #e05252;
+}
+
+/* Results Section */
+#results {
+  margin-top: 20px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 600px) {
+  .container {
+    width: 100%;
+    padding: 20px;
+  }
+
+  .up-bar {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .up-bar a {
+    padding: 10px 0;
+  }
+}
