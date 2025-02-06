@@ -1,34 +1,37 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
 const quizContainer = document.getElementById('quiz');
 const resultsContainer = document.getElementById('results');
 const submitButton = document.getElementById('submit');
 
-fetch('http://localhost:8000/api/questions')
-  .then(response => response.json())
-  .then(data => {
-    const quizQuestions = data.map(q => ({
+let quizQuestions = []; // This will store the fetched questions
+
+// Fetch questions from the backend
+async function fetchQuestions() {
+  try {
+    const response = await fetch('http://localhost:8000/api/questions');
+    const data = await response.json();
+    quizQuestions = data.map(q => ({
       question: q.question,
-      answers: { a: q.option_a, b: q.option_b, c: q.option_c },
+      answers: {
+        a: q.option_a,
+        b: q.option_b,
+        c: q.option_c
+      },
       correctAnswer: q.correct_answer
     }));
+    buildQuiz(); // Build the quiz once questions are fetched
+  } catch (error) {
+    console.error('Error fetching questions:', error);
+  }
+}
 
-    buildQuiz(quizQuestions); // Pass quizQuestions to the function
-    submitButton.addEventListener('click', () => showResults(quizQuestions)); // Pass quizQuestions
-  })
-  .catch(error => console.error("Error fetching questions:", error));
-
-function buildQuiz(quizQuestions) {
+// Build the quiz
+function buildQuiz() {
   const output = [];
 
   quizQuestions.forEach((currentQuestion, questionNumber) => {
     const answers = [];
 
-    for (let letter in currentQuestion.answers) {
+    for (letter in currentQuestion.answers) {
       answers.push(
         `<label>
           <input type="radio" name="question${questionNumber}" value="${letter}">
@@ -47,7 +50,8 @@ function buildQuiz(quizQuestions) {
   quizContainer.innerHTML = output.join('');
 }
 
-function showResults(quizQuestions) {
+// Show results
+function showResults() {
   const answerContainers = quizContainer.querySelectorAll('.answers');
   let numCorrect = 0;
 
@@ -67,47 +71,28 @@ function showResults(quizQuestions) {
   resultsContainer.innerHTML = `${numCorrect} out of ${quizQuestions.length}`;
 }
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC-fMfJLzeiAQWhubnnLsmBA2RW8JWLWKM",
-  authDomain: "quizapp-465fa.firebaseapp.com",
-  projectId: "quizapp-465fa",
-  storageBucket: "quizapp-465fa.firebasestorage.app",
-  messagingSenderId: "888365017850",
-  appId: "1:888365017850:web:89f6ad2c989a18b329b743",
-  measurementId: "G-E43XYSWJGZ"
-};
+// Fetch questions and build the quiz when the page loads
+fetchQuestions();
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// Event listener for the submit button
+submitButton.addEventListener('click', showResults);
 
-// Google Sign-In
-document.getElementById('cta-button').addEventListener('click', () => {
-  const provider = new GoogleAuthProvider();
-  signInWithPopup(auth, provider)
-    .then((result) => {
-      // User signed in successfully
-      const user = result.user;
-      console.log('User signed in:', user);
-      // Redirect to the main page
-      window.location.href = '/main.html';
-    })
-    .catch((error) => {
-      console.error('Error signing in:', error);
-    });
-});
+document.getElementById("submit").addEventListener("click", () => {
+  const totalQuestions = 10; // Adjust this based on your quiz data
+  let correctAnswers = 0;
 
-// Check authentication state
-auth.onAuthStateChanged((user) => {
-  if (user) {
-    console.log('User is authenticated:', user);
-    // Show the sign-out button
-    document.getElementById('sign-out-button').style.display = 'block';
-  } else {
-    console.log('User is not authenticated.');
-    // Hide the sign-out button
-    document.getElementById('sign-out-button').style.display = 'none';
-  }
+  // Evaluate answers (modify logic based on your quiz implementation)
+  const selectedAnswers = document.querySelectorAll("input[type='radio']:checked");
+  selectedAnswers.forEach((answer) => {
+    if (answer.dataset.correct === "true") {
+      correctAnswers++;
+    }
+  });
+
+  // Save results to localStorage
+  localStorage.setItem("totalQuestions", totalQuestions);
+  localStorage.setItem("correctAnswers", correctAnswers);
+
+  // Redirect to results page
+  window.location.href = "results.html";
 });

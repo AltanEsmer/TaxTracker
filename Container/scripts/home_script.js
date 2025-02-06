@@ -48,3 +48,17 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
+// Listen for auth state changes
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // User is signed in
+    const userName = user.displayName || "Quiz Master"; // Default if no name is set
+    console.log("User Name:", userName);
+
+    // Save the user's name in localStorage for the results page
+    localStorage.setItem("userName", userName);
+  } else {
+    // User is not signed in
+    console.log("No user is signed in.");
+  }
+});

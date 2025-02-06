@@ -4,31 +4,36 @@ body {
   background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   height: 100vh;
   margin: 0;
+  padding-top: 20px;
 }
 
 /* Container Styling */
 .container {
   background: white;
   padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+  border-radius: 15px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
   text-align: center;
   width: 90%;
   max-width: 500px;
+  animation: fadeIn 0.5s ease-in-out;
 }
 
 /* Navigation Bar */
 .up-bar {
   background: linear-gradient(45deg, #ff6b6b, #556270);
-  padding: 15px;
+  padding: 15px 20px;
   display: flex;
-  justify-content: space-around;
+  justify-content: space-between;
+  align-items: center;
   border-radius: 10px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-  margin-bottom: 20px;
+  margin-bottom: 25px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .up-bar a {
@@ -41,59 +46,71 @@ body {
 
 .up-bar a:hover {
   color: #ffeb3b;
+  text-shadow: 1px 1px 5px rgba(255, 255, 255, 0.6);
   transform: scale(1.1);
 }
 
 /* Quiz Styling */
 #quiz {
   text-align: left;
+  margin-top: 20px;
 }
 
 .question {
   font-size: 20px;
   font-weight: bold;
-  margin: 15px 0;
+  margin: 20px 0 10px;
+  line-height: 1.5;
 }
 
 .answers label {
   display: block;
   font-size: 16px;
-  margin: 5px 0;
-  padding: 5px;
-  background: #f0f0f0;
-  border-radius: 5px;
+  margin: 10px 0;
+  padding: 8px 12px;
+  background: #f8f8f8;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.3s ease;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .answers label:hover {
-  background: #ddd;
+  background: #f0f0f0;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Submit Button */
 button {
   padding: 12px 25px;
   font-size: 18px;
-  margin-top: 20px;
+  margin-top: 25px;
   cursor: pointer;
   border: none;
-  border-radius: 5px;
-  background: #ff6b6b;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #ff6b6b, #556270);
   color: white;
   font-weight: bold;
-  transition: background 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
 }
 
 button:hover {
-  background: #e05252;
+  background: linear-gradient(45deg, #e05252, #3e4e6b);
+  box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+  transform: scale(1.05);
 }
 
 /* Results Section */
 #results {
-  margin-top: 20px;
+  margin-top: 30px;
   font-size: 20px;
   font-weight: bold;
   color: #333;
+  padding: 10px;
+  border-radius: 10px;
+  background: #f9f9f9;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
 }
 
 /* Mobile Responsiveness */
@@ -106,9 +123,28 @@ button:hover {
   .up-bar {
     flex-direction: column;
     text-align: center;
+    padding: 10px;
   }
 
   .up-bar a {
     padding: 10px 0;
+    font-size: 16px;
+  }
+
+  button {
+    font-size: 16px;
+    padding: 10px 20px;
+  }
+}
+
+/* Keyframes for smooth fade-in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

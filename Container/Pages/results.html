@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz Results</title>
+  <link rel="stylesheet" href="../styles/results_styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> <!-- Include Chart.js -->
+</head>
+<body>
+  <div class="container">
+    <h1>Your Results, <span id="user-name"></span>!</h1>
+    <div id="results-section">
+      <p>Total Questions: <span id="total-questions"></span></p>
+      <p>Correct Answers: <span id="correct-answers"></span></p>
+      <p>Your Grade: <span id="grade"></span></p>
+      <p id="funny-message"></p>
+    </div>
+
+    <!-- Chart Container -->
+    <canvas id="results-chart" width="400" height="200"></canvas>
+
+    <button onclick="window.location.href='home.html'">Go Back Home</button>
+  </div>
+  <script src="../scripts/results_script.js"></script>
+</body>
+</html>

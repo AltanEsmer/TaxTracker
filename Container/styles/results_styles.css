@@ -1,0 +1,70 @@
+/* General Styling */
+body {
+  font-family: 'Poppins', sans-serif;
+  background: linear-gradient(135deg, #f4f4f4, #e0e0e0);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+/* Results Container */
+.container {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  width: 90%;
+  max-width: 500px;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+#results-section p {
+  font-size: 18px;
+  margin: 10px 0;
+}
+
+#results-section span {
+  font-weight: bold;
+  color: #ff6b6b;
+}
+
+/* Button */
+button {
+  padding: 12px 25px;
+  font-size: 18px;
+  margin-top: 20px;
+  cursor: pointer;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(45deg, #ff6b6b, #556270);
+  color: white;
+  font-weight: bold;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+  transition: background 0.3s ease;
+}
+
+button:hover {
+  background: linear-gradient(45deg, #e05252, #3e4e6b);
+}
+
+/* Add spacing for the chart */
+#results-chart {
+  margin: 20px auto;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Styling for the funny message */
+#funny-message {
+  margin-top: 15px;
+  font-size: 18px;
+  font-style: italic;
+  color: #ff6b6b;
+}
