@@ -1,10 +1,10 @@
 // Retrieve data from localStorage
-const totalQuestions = localStorage.getItem("totalQuestions") || 0;
-const correctAnswers = localStorage.getItem("correctAnswers") || 0;
+const totalQuestions = parseInt(localStorage.getItem("totalQuestions"), 10) || 0;
+const correctAnswers = parseInt(localStorage.getItem("correctAnswers"), 10) || 0;
 const userName = localStorage.getItem("userName") || "Quiz Master"; // Assuming the name is stored
 
 // Calculate grade percentage
-const grade = ((correctAnswers / totalQuestions) * 100).toFixed(2);
+const grade = totalQuestions > 0 ? ((correctAnswers / totalQuestions) * 100).toFixed(2) : "0.00";
 
 // Display results in the HTML
 document.getElementById("total-questions").textContent = totalQuestions;
@@ -51,6 +51,8 @@ const chart = new Chart(ctx, {
     scales: {
       y: {
         beginAtZero: true,
+        stepSize: 1,
+        max: totalQuestions, // Ensure chart scales correctly
       },
     },
   },

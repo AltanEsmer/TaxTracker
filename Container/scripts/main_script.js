@@ -34,7 +34,8 @@ function buildQuiz() {
     for (letter in currentQuestion.answers) {
       answers.push(
         `<label>
-          <input type="radio" name="question${questionNumber}" value="${letter}">
+          <input type="radio" name="question${questionNumber}" value="${letter}" 
+                 data-correct="${letter === currentQuestion.correctAnswer}">
           ${letter} :
           ${currentQuestion.answers[letter]}
         </label>`
@@ -69,6 +70,13 @@ function showResults() {
   });
 
   resultsContainer.innerHTML = `${numCorrect} out of ${quizQuestions.length}`;
+
+  // Save results to localStorage
+  localStorage.setItem("totalQuestions", quizQuestions.length);
+  localStorage.setItem("correctAnswers", numCorrect);
+
+  // Redirect to results page
+  window.location.href = "results.html";
 }
 
 // Fetch questions and build the quiz when the page loads
@@ -76,23 +84,3 @@ fetchQuestions();
 
 // Event listener for the submit button
 submitButton.addEventListener('click', showResults);
-
-document.getElementById("submit").addEventListener("click", () => {
-  const totalQuestions = 10; // Adjust this based on your quiz data
-  let correctAnswers = 0;
-
-  // Evaluate answers (modify logic based on your quiz implementation)
-  const selectedAnswers = document.querySelectorAll("input[type='radio']:checked");
-  selectedAnswers.forEach((answer) => {
-    if (answer.dataset.correct === "true") {
-      correctAnswers++;
-    }
-  });
-
-  // Save results to localStorage
-  localStorage.setItem("totalQuestions", totalQuestions);
-  localStorage.setItem("correctAnswers", correctAnswers);
-
-  // Redirect to results page
-  window.location.href = "results.html";
-});
