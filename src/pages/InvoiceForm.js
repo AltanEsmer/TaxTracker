@@ -11,7 +11,8 @@ import {
   Col, 
   Card, 
   message, 
-  Spin 
+  Spin,
+  Divider
 } from 'antd';
 import { 
   SaveOutlined, 
@@ -28,6 +29,7 @@ const InvoiceForm = () => {
   const [loading, setLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
+  const [fxRates, setFxRates] = useState(null);
   
   const { id } = useParams();
   const navigate = useNavigate();
@@ -37,7 +39,28 @@ const InvoiceForm = () => {
       setIsEditing(true);
       fetchInvoice(id);
     }
+    
+    // Fetch current month's FX rates
+    fetchCurrentFxRates();
   }, [id]);
+
+  const fetchCurrentFxRates = async () => {
+    try {
+      const currentDate = new Date();
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth() + 1;
+      
+      const rates = await window.api.getFxRates(year, month);
+      
+      if (rates && rates.length > 0) {
+        setFxRates(rates[0]);
+      } else {
+        message.warning('Bu ay için kur bilgisi bulunamadı. Lütfen Kur Yönetimi sayfasından ekleyin.');
+      }
+    } catch (error) {
+      console.error('Error fetching FX rates:', error);
+    }
+  };
 
   const fetchInvoice = async (invoiceId) => {
     try {
@@ -102,6 +125,25 @@ const InvoiceForm = () => {
     return total;
   };
 
+  const getTryEquivalent = () => {
+    if (!fxRates) return null;
+    
+    const subtotal = form.getFieldValue('subtotal') || 0;
+    const currency = form.getFieldValue('currency');
+    
+    if (currency === 'TRY') {
+      return subtotal;
+    } else if (currency === 'USD' && fxRates.usd_to_try) {
+      return subtotal * fxRates.usd_to_try;
+    } else if (currency === 'EUR' && fxRates.eur_to_try) {
+      return subtotal * fxRates.eur_to_try;
+    }
+    
+    return null;
+  };
+
+  const tryEquivalent = getTryEquivalent();
+
   return (
     <div>
       <Row gutter={[16, 16]} align="middle" className="page-header">
@@ -129,12 +171,13 @@ const InvoiceForm = () => {
               currency: 'TRY',
               vat_rate: 18,
               subtotal: 0,
-              total: 0
+              total: 0,
+              invoice_type: 'Alış'
             }}
             className="form-container"
           >
             <Row gutter={16}>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item
                   name="date"
                   label="Tarih"
@@ -146,7 +189,19 @@ const InvoiceForm = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
+                <Form.Item
+                  name="invoice_type"
+                  label="Fatura Tipi"
+                  rules={[{ required: true, message: 'Lütfen fatura tipi seçin' }]}
+                >
+                  <Select>
+                    <Option value="Alış">Alış</Option>
+                    <Option value="Satış">Satış</Option>
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col span={6}>
                 <Form.Item
                   name="company"
                   label="Şirket İsmi"
@@ -155,7 +210,7 @@ const InvoiceForm = () => {
                   <Input />
                 </Form.Item>
               </Col>
-              <Col span={8}>
+              <Col span={6}>
                 <Form.Item
                   name="invoice_no"
                   label="Fatura No"
@@ -165,6 +220,8 @@ const InvoiceForm = () => {
                 </Form.Item>
               </Col>
             </Row>
+
+            <Divider style={{ background: form.getFieldValue('invoice_type') === 'Alış' ? '#1890ff' : '#52c41a' }} />
 
             <Row gutter={16}>
               <Col span={8}>
@@ -203,7 +260,7 @@ const InvoiceForm = () => {
                   label="Para Birimi"
                   rules={[{ required: true, message: 'Lütfen para birimi seçin' }]}
                 >
-                  <Select>
+                  <Select onChange={calculateTotal}>
                     <Option value="TRY">TRY</Option>
                     <Option value="USD">USD</Option>
                     <Option value="EUR">EUR</Option>
@@ -227,7 +284,19 @@ const InvoiceForm = () => {
                   />
                 </Form.Item>
               </Col>
-              <Col span={16} style={{ textAlign: 'right', marginTop: 30 }}>
+              <Col span={8}>
+                {tryEquivalent !== null && form.getFieldValue('currency') !== 'TRY' && (
+                  <div style={{ marginTop: 29 }}>
+                    <strong>TL Karşılığı:</strong> {tryEquivalent.toFixed(2)} TL
+                    {fxRates && (
+                      <div style={{ fontSize: '12px', color: '#888' }}>
+                        Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Col>
+              <Col span={8} style={{ textAlign: 'right', marginTop: 30 }}>
                 <Form.Item>
                   <Button 
                     type="primary" 

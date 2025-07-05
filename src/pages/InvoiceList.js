@@ -11,7 +11,9 @@ import {
   Select, 
   Popconfirm, 
   message, 
-  Spin 
+  Spin,
+  Tag,
+  Divider
 } from 'antd';
 import { 
   PlusOutlined, 
@@ -34,7 +36,8 @@ const InvoiceList = () => {
     startDate: null,
     endDate: null,
     company: '',
-    currency: ''
+    currency: '',
+    invoice_type: ''
   });
   
   const navigate = useNavigate();
@@ -47,7 +50,21 @@ const InvoiceList = () => {
     try {
       setLoading(true);
       const data = await window.api.getInvoices(filters);
-      setInvoices(data);
+      
+      // Sort by invoice type and date
+      const sortedData = [...data].sort((a, b) => {
+        // First sort by invoice type
+        const typeA = a.invoice_type || 'Alış';
+        const typeB = b.invoice_type || 'Alış';
+        const typeCompare = typeA.localeCompare(typeB);
+        
+        if (typeCompare !== 0) return typeCompare;
+        
+        // Then sort by date (descending)
+        return new Date(b.date) - new Date(a.date);
+      });
+      
+      setInvoices(sortedData);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       message.error('Faturalar yüklenirken bir hata oluştu.');
@@ -96,9 +113,24 @@ const InvoiceList = () => {
       startDate: null,
       endDate: null,
       company: '',
-      currency: ''
+      currency: '',
+      invoice_type: ''
     });
     fetchInvoices();
+  };
+
+  // Add row class name based on invoice type
+  const getRowClassName = (record, index) => {
+    if (index > 0) {
+      const prevInvoice = invoices[index - 1];
+      const currentType = record.invoice_type || 'Alış';
+      const prevType = prevInvoice.invoice_type || 'Alış';
+      
+      if (currentType !== prevType) {
+        return 'invoice-type-separator';
+      }
+    }
+    return '';
   };
 
   const columns = [
@@ -108,6 +140,16 @@ const InvoiceList = () => {
       key: 'date',
       render: text => dayjs(text).format('DD/MM/YYYY'),
       sorter: (a, b) => dayjs(a.date).unix() - dayjs(b.date).unix()
+    },
+    {
+      title: 'Fatura Tipi',
+      dataIndex: 'invoice_type',
+      key: 'invoice_type',
+      render: text => {
+        const color = text === 'Alış' ? 'blue' : 'green';
+        return <Tag color={color}>{text || 'Alış'}</Tag>;
+      },
+      sorter: (a, b) => (a.invoice_type || 'Alış').localeCompare(b.invoice_type || 'Alış')
     },
     {
       title: 'Şirket',
@@ -197,7 +239,7 @@ const InvoiceList = () => {
       </Row>
 
       <Row gutter={16} style={{ marginBottom: 16 }}>
-        <Col span={6}>
+        <Col span={5}>
           <RangePicker 
             style={{ width: '100%' }}
             onChange={handleDateRangeChange}
@@ -208,7 +250,7 @@ const InvoiceList = () => {
             ]}
           />
         </Col>
-        <Col span={6}>
+        <Col span={5}>
           <Input
             placeholder="Şirket Ara"
             value={filters.company}
@@ -216,7 +258,7 @@ const InvoiceList = () => {
             prefix={<SearchOutlined />}
           />
         </Col>
-        <Col span={6}>
+        <Col span={4}>
           <Select
             placeholder="Para Birimi"
             style={{ width: '100%' }}
@@ -227,6 +269,18 @@ const InvoiceList = () => {
             <Option value="TRY">TRY</Option>
             <Option value="USD">USD</Option>
             <Option value="EUR">EUR</Option>
+          </Select>
+        </Col>
+        <Col span={4}>
+          <Select
+            placeholder="Fatura Tipi"
+            style={{ width: '100%' }}
+            value={filters.invoice_type || undefined}
+            onChange={value => handleFilterChange('invoice_type', value)}
+            allowClear
+          >
+            <Option value="Alış">Alış</Option>
+            <Option value="Satış">Satış</Option>
           </Select>
         </Col>
         <Col span={6}>
@@ -243,13 +297,23 @@ const InvoiceList = () => {
         </Col>
       </Row>
 
+      <style jsx global>{`
+        .invoice-type-separator td {
+          border-top: 3px solid #f0f0f0;
+        }
+        .ant-table-row:hover .invoice-type-separator {
+          border-top: 3px solid #f0f0f0;
+        }
+      `}</style>
+
       <Spin spinning={loading}>
         <Table 
           columns={columns} 
           dataSource={invoices} 
           rowKey="id" 
           pagination={{ pageSize: 10 }}
-          scroll={{ x: 1000 }}
+          scroll={{ x: true }}
+          rowClassName={getRowClassName}
         />
       </Spin>
     </div>

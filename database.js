@@ -27,6 +27,16 @@ class DatabaseManager {
       if (fs.existsSync(this.invoicesPath)) {
         const data = fs.readFileSync(this.invoicesPath, 'utf8');
         this.invoices = JSON.parse(data);
+        
+        // Ensure all invoices have an invoice_type field
+        this.invoices = this.invoices.map(invoice => {
+          if (!invoice.invoice_type) {
+            return { ...invoice, invoice_type: 'Alış' };
+          }
+          return invoice;
+        });
+        
+        this.saveInvoices();
       } else {
         this.invoices = [];
         this.saveInvoices();
@@ -100,6 +110,10 @@ class DatabaseManager {
         if (filters.currency) {
           result = result.filter(invoice => invoice.currency === filters.currency);
         }
+        
+        if (filters.invoice_type) {
+          result = result.filter(invoice => invoice.invoice_type === filters.invoice_type);
+        }
       }
       
       // Sort by date descending
@@ -118,7 +132,13 @@ class DatabaseManager {
         ? Math.max(...this.invoices.map(inv => inv.id)) + 1 
         : 1;
       
-      const newInvoice = { id, ...invoice };
+      // Ensure invoice_type is set, default to 'Alış' if not provided
+      const newInvoice = { 
+        id, 
+        ...invoice,
+        invoice_type: invoice.invoice_type || 'Alış'
+      };
+      
       this.invoices.push(newInvoice);
       this.saveInvoices();
       
@@ -134,7 +154,11 @@ class DatabaseManager {
       const index = this.invoices.findIndex(inv => inv.id === Number(id));
       
       if (index !== -1) {
-        this.invoices[index] = { id: Number(id), ...invoice };
+        this.invoices[index] = { 
+          id: Number(id), 
+          ...invoice,
+          invoice_type: invoice.invoice_type || 'Alış'
+        };
         this.saveInvoices();
         return this.invoices[index];
       } else {
@@ -240,7 +264,7 @@ class DatabaseManager {
   // Dashboard data
   getDashboardData(filters = {}) {
     try {
-      const { startDate, endDate } = filters;
+      const { startDate, endDate, invoice_type } = filters;
       
       // Filter invoices by date if specified
       let filteredInvoices = [...this.invoices];
@@ -259,73 +283,89 @@ class DatabaseManager {
         );
       }
       
-      // Calculate VAT by month and currency
+      // Filter by invoice type if specified
+      if (invoice_type) {
+        filteredInvoices = filteredInvoices.filter(invoice => 
+          invoice.invoice_type === invoice_type
+        );
+      }
+      
+      // Calculate VAT by month, currency, and invoice type
       const vatByMonth = [];
-      const monthCurrencyMap = new Map();
+      const monthCurrencyTypeMap = new Map();
       
       filteredInvoices.forEach(invoice => {
         const date = new Date(invoice.date);
         const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        const key = `${month}-${invoice.currency}`;
+        const invoiceType = invoice.invoice_type || 'Alış';
+        const key = `${month}-${invoice.currency}-${invoiceType}`;
         
-        if (!monthCurrencyMap.has(key)) {
-          monthCurrencyMap.set(key, {
+        if (!monthCurrencyTypeMap.has(key)) {
+          monthCurrencyTypeMap.set(key, {
             month,
             currency: invoice.currency,
+            invoice_type: invoiceType,
             vat_amount: 0,
             invoice_count: 0
           });
         }
         
-        const entry = monthCurrencyMap.get(key);
+        const entry = monthCurrencyTypeMap.get(key);
         entry.vat_amount += invoice.subtotal * (invoice.vat_rate / 100);
         entry.invoice_count += 1;
       });
       
-      monthCurrencyMap.forEach(value => vatByMonth.push(value));
+      monthCurrencyTypeMap.forEach(value => vatByMonth.push(value));
       
-      // Calculate currency distribution
-      const currencyMap = new Map();
+      // Calculate currency and type distribution
+      const currencyTypeMap = new Map();
       
       filteredInvoices.forEach(invoice => {
-        if (!currencyMap.has(invoice.currency)) {
-          currencyMap.set(invoice.currency, {
+        const invoiceType = invoice.invoice_type || 'Alış';
+        const key = `${invoice.currency}-${invoiceType}`;
+        
+        if (!currencyTypeMap.has(key)) {
+          currencyTypeMap.set(key, {
             currency: invoice.currency,
+            invoice_type: invoiceType,
             count: 0,
             total_amount: 0
           });
         }
         
-        const entry = currencyMap.get(invoice.currency);
+        const entry = currencyTypeMap.get(key);
         entry.count += 1;
         entry.total_amount += invoice.total;
       });
       
       const currencyDistribution = [];
-      currencyMap.forEach(value => currencyDistribution.push(value));
+      currencyTypeMap.forEach(value => currencyDistribution.push(value));
       
-      // Calculate monthly totals
-      const monthMap = new Map();
+      // Calculate monthly totals by invoice type
+      const monthTypeMap = new Map();
       
       filteredInvoices.forEach(invoice => {
         const date = new Date(invoice.date);
         const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const invoiceType = invoice.invoice_type || 'Alış';
+        const key = `${month}-${invoiceType}`;
         
-        if (!monthMap.has(month)) {
-          monthMap.set(month, {
+        if (!monthTypeMap.has(key)) {
+          monthTypeMap.set(key, {
             month,
+            invoice_type: invoiceType,
             total_amount: 0,
             invoice_count: 0
           });
         }
         
-        const entry = monthMap.get(month);
+        const entry = monthTypeMap.get(key);
         entry.total_amount += invoice.total;
         entry.invoice_count += 1;
       });
       
       const monthlyTotals = [];
-      monthMap.forEach(value => monthlyTotals.push(value));
+      monthTypeMap.forEach(value => monthlyTotals.push(value));
       
       // Sort by month
       monthlyTotals.sort((a, b) => a.month.localeCompare(b.month));
