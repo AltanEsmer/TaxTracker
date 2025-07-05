@@ -1,0 +1,26 @@
+appId: com.taxtracker.app
+productName: Tax Tracker
+copyright: Copyright © 2023
+
+directories:
+  output: release
+
+files:
+  - "build/**/*"
+  - "main.js"
+  - "preload.js"
+  - "database.js"
+  - "package.json"
+
+extraMetadata:
+  main: "main.js"
+
+win:
+  target: nsis
+
+mac:
+  target: dmg
+
+linux:
+  target:
+    - AppImage 
