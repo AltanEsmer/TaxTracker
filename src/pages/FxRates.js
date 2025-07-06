@@ -141,13 +141,13 @@ const FxRates = () => {
       title: 'USD/TRY',
       dataIndex: 'usd_to_try',
       key: 'usd_to_try',
-      render: value => value.toFixed(4)
+      render: value => (typeof value === 'number' ? value.toFixed(4) : '-')
     },
     {
       title: 'EUR/TRY',
       dataIndex: 'eur_to_try',
       key: 'eur_to_try',
-      render: value => value.toFixed(4)
+      render: value => (typeof value === 'number' ? value.toFixed(4) : '-')
     },
     {
       title: 'İşlemler',

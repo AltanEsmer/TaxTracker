@@ -265,14 +265,13 @@ const Dashboard = () => {
 
   // Calculate summary statistics
   const calculateTotalVat = (type = null) => {
-    if (!dashboardData || !dashboardData.vatByMonth) return 0;
-    
+    if (!dashboardData || !dashboardData.vatByMonth) return '0.00';
     let filteredData = dashboardData.vatByMonth;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    
-    return filteredData.reduce((sum, item) => sum + Number(item.vat_amount), 0).toFixed(2);
+    const total = filteredData.reduce((sum, item) => sum + Number(item.vat_amount), 0);
+    return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
   const calculateTotalInvoices = (type = null) => {
@@ -287,17 +286,13 @@ const Dashboard = () => {
   };
 
   const calculateTotalAmount = (type = null) => {
-    if (!dashboardData || !dashboardData.currencyDistribution) return 0;
-    
+    if (!dashboardData || !dashboardData.currencyDistribution) return '0.00';
     let filteredData = dashboardData.currencyDistribution;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    
-    // Note: This is simplified and doesn't convert currencies
-    return filteredData
-      .reduce((sum, item) => sum + Number(item.total_amount), 0)
-      .toFixed(2);
+    const total = filteredData.reduce((sum, item) => sum + Number(item.total_amount), 0);
+    return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
   if (loading) {

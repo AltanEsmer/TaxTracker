@@ -313,9 +313,9 @@ const InvoiceList = () => {
       key: 'subtotal',
       render: (text, record) => (
         <>
-          <div>{text.toFixed(2)} {record.currency}</div>
+          <div>{typeof text === 'number' ? text.toFixed(2) : '-'} {record.currency}</div>
           <small style={{ color: '#888' }}>
-            {record.try_equivalent ? record.try_equivalent.subtotal.toFixed(2) : '-'} TL
+            {record.try_equivalent && typeof record.try_equivalent.subtotal === 'number' ? record.try_equivalent.subtotal.toFixed(2) : '-'} TL
           </small>
         </>
       ),
@@ -332,12 +332,12 @@ const InvoiceList = () => {
       title: 'KDV Tutarı',
       key: 'vat_amount',
       render: (_, record) => {
-        const vatAmount = record.subtotal * (record.vat_rate / 100);
+        const vatAmount = (typeof record.subtotal === 'number' && typeof record.vat_rate === 'number') ? record.subtotal * (record.vat_rate / 100) : 0;
         return (
           <>
-            <div>{vatAmount.toFixed(2)} {record.currency}</div>
+            <div>{typeof vatAmount === 'number' ? vatAmount.toFixed(2) : '-'} {record.currency}</div>
             <small style={{ color: '#888' }}>
-              {record.try_equivalent ? record.try_equivalent.vat_amount.toFixed(2) : '-'} TL
+              {record.try_equivalent && typeof record.try_equivalent.vat_amount === 'number' ? record.try_equivalent.vat_amount.toFixed(2) : '-'} TL
             </small>
           </>
         );
@@ -350,9 +350,9 @@ const InvoiceList = () => {
       key: 'total',
       render: (text, record) => (
         <>
-          <div>{text.toFixed(2)} {record.currency}</div>
+          <div>{typeof text === 'number' ? text.toFixed(2) : '-'} {record.currency}</div>
           <small style={{ color: '#888' }}>
-            {record.try_equivalent ? record.try_equivalent.total.toFixed(2) : '-'} TL
+            {record.try_equivalent && typeof record.try_equivalent.total === 'number' ? record.try_equivalent.total.toFixed(2) : '-'} TL
           </small>
         </>
       ),
@@ -495,14 +495,14 @@ const InvoiceList = () => {
                   <strong>TOPLAM (TL)</strong>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={4}>
-                  <strong>{totals.subtotal.toFixed(2)} TL</strong>
+                  <strong>{typeof totals.subtotal === 'number' ? totals.subtotal.toFixed(2) : '0.00'} TL</strong>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={5}></Table.Summary.Cell>
                 <Table.Summary.Cell index={6}>
-                  <strong>{totals.vatAmount.toFixed(2)} TL</strong>
+                  <strong>{typeof totals.vatAmount === 'number' ? totals.vatAmount.toFixed(2) : '0.00'} TL</strong>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={7}>
-                  <strong>{totals.total.toFixed(2)} TL</strong>
+                  <strong>{typeof totals.total === 'number' ? totals.total.toFixed(2) : '0.00'} TL</strong>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={8}></Table.Summary.Cell>
               </Table.Summary.Row>
@@ -516,7 +516,7 @@ const InvoiceList = () => {
           <Card>
             <Statistic 
               title="Toplam Ara Toplam (TL)" 
-              value={totals.subtotal} 
+              value={typeof totals.subtotal === 'number' ? totals.subtotal : 0} 
               precision={2}
               suffix="TL" 
             />
@@ -526,7 +526,7 @@ const InvoiceList = () => {
           <Card>
             <Statistic 
               title="Toplam KDV (TL)" 
-              value={totals.vatAmount} 
+              value={typeof totals.vatAmount === 'number' ? totals.vatAmount : 0} 
               precision={2} 
               suffix="TL"
             />
@@ -536,7 +536,7 @@ const InvoiceList = () => {
           <Card>
             <Statistic 
               title="Toplam Genel Toplam (TL)" 
-              value={totals.total} 
+              value={typeof totals.total === 'number' ? totals.total : 0} 
               precision={2} 
               suffix="TL"
             />
