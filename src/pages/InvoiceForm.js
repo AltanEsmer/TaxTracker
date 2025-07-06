@@ -12,7 +12,8 @@ import {
   Card, 
   message, 
   Spin,
-  Divider
+  Divider,
+  Switch
 } from 'antd';
 import { 
   SaveOutlined, 
@@ -30,6 +31,12 @@ const InvoiceForm = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [fxRates, setFxRates] = useState(null);
+  const [manualTotal, setManualTotal] = useState(false);
+  const [tryValues, setTryValues] = useState({
+    subtotal: 0,
+    vatAmount: 0,
+    total: 0
+  });
   
   const { id } = useParams();
   const navigate = useNavigate();
@@ -75,6 +82,7 @@ const InvoiceForm = () => {
           ...invoice,
           date: dayjs(invoice.date)
         });
+        updateTryValues(invoice.subtotal, invoice.vat_rate, invoice.total, invoice.currency);
       } else {
         message.error('Fatura bulunamadı.');
         navigate('/invoices');
@@ -94,7 +102,12 @@ const InvoiceForm = () => {
       // Format the date
       const formattedValues = {
         ...values,
-        date: values.date.format('YYYY-MM-DD')
+        date: values.date.format('YYYY-MM-DD'),
+        try_equivalent: {
+          subtotal: tryValues.subtotal,
+          vat_amount: tryValues.vatAmount,
+          total: tryValues.total
+        }
       };
       
       if (isEditing) {
@@ -115,6 +128,8 @@ const InvoiceForm = () => {
   };
 
   const calculateTotal = () => {
+    if (manualTotal) return;
+    
     const subtotal = form.getFieldValue('subtotal') || 0;
     const vatRate = form.getFieldValue('vat_rate') || 0;
     
@@ -122,27 +137,72 @@ const InvoiceForm = () => {
     const total = subtotal + vatAmount;
     
     form.setFieldsValue({ total });
+    
+    // Update TRY values
+    updateTryValues(subtotal, vatRate, total, form.getFieldValue('currency'));
+    
     return total;
   };
 
-  const getTryEquivalent = () => {
-    if (!fxRates) return null;
+  const updateTryValues = (subtotal, vatRate, total, currency) => {
+    if (!fxRates || !currency) return;
     
-    const subtotal = form.getFieldValue('subtotal') || 0;
-    const currency = form.getFieldValue('currency');
-    
-    if (currency === 'TRY') {
-      return subtotal;
-    } else if (currency === 'USD' && fxRates.usd_to_try) {
-      return subtotal * fxRates.usd_to_try;
+    let rate = 1;
+    if (currency === 'USD' && fxRates.usd_to_try) {
+      rate = parseFloat(fxRates.usd_to_try);
     } else if (currency === 'EUR' && fxRates.eur_to_try) {
-      return subtotal * fxRates.eur_to_try;
+      rate = parseFloat(fxRates.eur_to_try);
     }
     
-    return null;
+    const trySubtotal = subtotal * rate;
+    const tryVatAmount = (subtotal * (vatRate / 100)) * rate;
+    const tryTotal = total * rate;
+    
+    console.log('Currency:', currency, 'Rate:', rate, 'TRY Total:', tryTotal);
+    
+    setTryValues({
+      subtotal: trySubtotal,
+      vatAmount: tryVatAmount,
+      total: tryTotal
+    });
   };
 
-  const tryEquivalent = getTryEquivalent();
+  const handleTotalChange = (value) => {
+    if (!manualTotal) return;
+    
+    // When manually changing total, calculate subtotal based on the VAT rate
+    const vatRate = form.getFieldValue('vat_rate') || 0;
+    const total = value || 0;
+    
+    // Calculate subtotal: total / (1 + vatRate/100)
+    const subtotal = vatRate === 0 ? total : total / (1 + vatRate / 100);
+    
+    // Update the subtotal field
+    form.setFieldsValue({ subtotal: parseFloat(subtotal.toFixed(2)) });
+    
+    // Update the TRY equivalent
+    updateTryValues(
+      subtotal,
+      vatRate,
+      total,
+      form.getFieldValue('currency')
+    );
+  };
+
+  const handleManualTotalChange = (checked) => {
+    setManualTotal(checked);
+    if (!checked) {
+      // If switching back to automatic, recalculate the total
+      calculateTotal();
+    }
+  };
+
+  const currencyChangeHandler = (value) => {
+    // Recalculate total when currency changes
+    setTimeout(() => {
+      calculateTotal();
+    }, 0);
+  };
 
   return (
     <div>
@@ -169,7 +229,7 @@ const InvoiceForm = () => {
             initialValues={{
               date: dayjs(),
               currency: 'TRY',
-              vat_rate: 18,
+              vat_rate: 0,
               subtotal: 0,
               total: 0,
               invoice_type: 'Alış'
@@ -236,8 +296,12 @@ const InvoiceForm = () => {
                     step={0.01}
                     precision={2}
                     onChange={calculateTotal}
+                    disabled={manualTotal}
                   />
                 </Form.Item>
+                <div style={{ marginTop: -15, marginBottom: 16 }}>
+                  <small style={{ color: '#888' }}>TL Karşılığı: {tryValues.subtotal.toFixed(2)} TL</small>
+                </div>
               </Col>
               <Col span={8}>
                 <Form.Item
@@ -253,6 +317,9 @@ const InvoiceForm = () => {
                     <Option value={20}>20%</Option>
                   </Select>
                 </Form.Item>
+                <div style={{ marginTop: -15, marginBottom: 16 }}>
+                  <small style={{ color: '#888' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
+                </div>
               </Col>
               <Col span={8}>
                 <Form.Item
@@ -260,41 +327,49 @@ const InvoiceForm = () => {
                   label="Para Birimi"
                   rules={[{ required: true, message: 'Lütfen para birimi seçin' }]}
                 >
-                  <Select onChange={calculateTotal}>
+                  <Select onChange={currencyChangeHandler}>
                     <Option value="TRY">TRY</Option>
                     <Option value="USD">USD</Option>
                     <Option value="EUR">EUR</Option>
                   </Select>
                 </Form.Item>
+                {fxRates && form.getFieldValue('currency') !== 'TRY' && (
+                  <div style={{ marginTop: -15, marginBottom: 16 }}>
+                    <small style={{ color: '#888' }}>
+                      Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
+                    </small>
+                  </div>
+                )}
               </Col>
             </Row>
 
             <Row gutter={16}>
               <Col span={8}>
-                <Form.Item
-                  name="total"
-                  label="Genel Toplam"
-                >
-                  <InputNumber 
-                    style={{ width: '100%' }}
-                    min={0}
-                    step={0.01}
-                    precision={2}
-                    disabled
-                  />
-                </Form.Item>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Form.Item
+                    name="total"
+                    label="Genel Toplam"
+                    style={{ flex: 1, marginRight: 8 }}
+                    rules={[{ required: true, message: 'Genel toplam gerekli' }]}
+                  >
+                    <InputNumber 
+                      style={{ width: '100%' }}
+                      min={0}
+                      step={0.01}
+                      precision={2}
+                      disabled={!manualTotal}
+                      onChange={handleTotalChange}
+                    />
+                  </Form.Item>
+                  <Form.Item label="Manuel">
+                    <Switch checked={manualTotal} onChange={handleManualTotalChange} />
+                  </Form.Item>
+                </div>
+                <div style={{ marginTop: -15 }}>
+                  <small style={{ color: '#888' }}>TL Karşılığı: {tryValues.total.toFixed(2)} TL</small>
+                </div>
               </Col>
               <Col span={8}>
-                {tryEquivalent !== null && form.getFieldValue('currency') !== 'TRY' && (
-                  <div style={{ marginTop: 29 }}>
-                    <strong>TL Karşılığı:</strong> {tryEquivalent.toFixed(2)} TL
-                    {fxRates && (
-                      <div style={{ fontSize: '12px', color: '#888' }}>
-                        Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
-                      </div>
-                    )}
-                  </div>
-                )}
               </Col>
               <Col span={8} style={{ textAlign: 'right', marginTop: 30 }}>
                 <Form.Item>

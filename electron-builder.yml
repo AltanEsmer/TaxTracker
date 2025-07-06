@@ -16,7 +16,18 @@ extraMetadata:
   main: "main.js"
 
 win:
-  target: nsis
+  target: 
+    - nsis
+  artifactName: "${productName}-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: true
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Tax Tracker"
+  runAfterFinish: true
 
 mac:
   target: dmg

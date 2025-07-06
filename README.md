@@ -1,22 +1,83 @@
-# Fatura Kayıt ve KDV Takip Uygulaması
+# Tax Tracker - Fatura ve KDV Takip Uygulaması
 
-Bu uygulama, faturaları kaydetmenizi, KDV takibini yapmanızı ve farklı para birimlerindeki faturaları TL cinsinden raporlamanızı sağlar.
+## Kurulum
 
-## Özellikler
+1. `Tax Tracker-Setup-1.0.0.exe` dosyasını çalıştırın (release klasöründe bulunmaktadır)
+2. Kurulum otomatik olarak tamamlanacaktır
+3. Uygulama otomatik olarak başlayacaktır
 
-- Fatura girişi ve yönetimi
-- Farklı para birimleri desteği (TRY, USD, EUR)
-- KDV hesaplamaları
-- Aylık kur girişi
-- Dashboard ile finansal verilerin görselleştirilmesi
+## Hızlı Başlatma
 
-## Teknolojiler
+Eğer uygulamayı kurmadan çalıştırmak isterseniz:
+1. `StartTaxTracker.bat` dosyasına çift tıklayın
+2. Bu, uygulamayı doğrudan başlatacaktır
 
-- Electron
-- React
-- SQLite
-- Chart.js
+## Kullanım
 
-## Kurulum ve Çalıştırma
+### İlk Kullanım
 
-Kurulum ve çalıştırma talimatları için [KURULUM.md](./KURULUM.md) dosyasına bakınız.
+- Uygulama kurulduktan sonra masaüstünüzde "Tax Tracker" kısayolu oluşturulacaktır
+- Bu kısayola tıklayarak uygulamayı başlatabilirsiniz
+- Uygulama ayrıca sistem tepsisinde (sağ alt köşede) bir simge olarak görünecektir
+
+### Sistem Tepsisi (Sağ Alt Köşe) Simgesi
+
+Uygulamanın sistem tepsisindeki simgesine sağ tıklayarak:
+
+- **Aç**: Uygulamayı açar veya öne getirir
+- **Bilgisayar başlangıcında çalıştır**: İşaretlendiğinde, bilgisayarınız her açıldığında uygulama otomatik olarak başlar
+- **Çıkış**: Uygulamayı tamamen kapatır
+
+### Fatura İşlemleri
+
+1. **Yeni Fatura Ekleme**:
+   - Ana sayfada "Yeni Fatura" butonuna tıklayın
+   - Gerekli bilgileri doldurun
+   - "Kaydet" butonuna tıklayın
+
+2. **Fatura Düzenleme**:
+   - Faturalar listesinde düzenlemek istediğiniz faturanın yanındaki düzenleme butonuna tıklayın
+   - Bilgileri güncelleyin
+   - "Güncelle" butonuna tıklayın
+
+3. **Fatura Silme**:
+   - Faturalar listesinde silmek istediğiniz faturanın yanındaki çöp kutusu butonuna tıklayın
+   - Onaylayın
+
+### Excel'e Aktarma
+
+- Faturalar sayfasında "Excel'e Aktar" butonuna tıklayın
+- Excel dosyası otomatik olarak oluşturulacak ve bilgisayarınıza kaydedilecektir
+- Excel dosyası iki sayfa içerir:
+  1. **Özet**: Alış ve satış faturalarının toplam tutarları ve KDV tutarları
+  2. **Faturalar**: Tüm faturaların detaylı listesi
+
+### Dashboard (Gösterge Paneli)
+
+- Dashboard sayfasında faturalarınızla ilgili özet bilgileri ve grafikleri görebilirsiniz
+- Tarih aralığını değiştirerek belirli bir döneme ait verileri görüntüleyebilirsiniz
+- "Tümü", "Alış" ve "Satış" sekmeleri arasında geçiş yaparak farklı türdeki faturaların özetlerini görebilirsiniz
+
+### Kur Yönetimi
+
+- Kur Yönetimi sayfasında döviz kurlarını ekleyebilir ve düzenleyebilirsiniz
+- Eklenen kurlar, yabancı para birimli faturaların TL karşılıklarının hesaplanmasında kullanılır
+
+## Önemli Notlar
+
+- Uygulama kapatıldığında sistem tepsisinde çalışmaya devam eder
+- Uygulamayı tamamen kapatmak için sistem tepsisindeki simgeye sağ tıklayıp "Çıkış" seçeneğini seçin
+- Bilgisayarınızı her açtığınızda uygulamanın otomatik başlaması için sistem tepsisindeki simgeye sağ tıklayıp "Bilgisayar başlangıcında çalıştır" seçeneğini işaretleyin
+
+## Yenilikler
+
+### Excel Dışa Aktarma İyileştirmeleri
+- Daha iyi sütun genişlikleri ve okunabilirlik
+- Başlıklar ve toplam satırları için stil iyileştirmeleri
+- Alış ve satış faturalarının özetlerini içeren ayrı bir sayfa
+- Sayılar ve para birimi değerleri için daha iyi biçimlendirme
+
+### Kullanım Kolaylığı
+- Uygulama sistem tepsisinde çalışmaya devam eder
+- Bilgisayar başlangıcında otomatik çalıştırma seçeneği
+- Masaüstü kısayolu ve kolay erişim

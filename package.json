@@ -13,7 +13,8 @@
     "prebuild": "npm run clean",
     "build": "npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml",
     "pack": "electron-builder --dir --config electron-builder.yml",
-    "dist": "npm run clean && npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml"
+    "dist": "npm run clean && npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml",
+    "build-installer": "npm run clean && npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml --win"
   },
   "author": "",
   "license": "MIT",
@@ -37,7 +38,8 @@
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.2",
-    "react-scripts": "5.0.1"
+    "react-scripts": "5.0.1",
+    "xlsx": "^0.18.5"
   },
   "browserslist": {
     "production": [

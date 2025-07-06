@@ -57,19 +57,17 @@ const Dashboard = () => {
     dayjs().startOf('month'),
     dayjs().endOf('month')
   ]);
-  const [invoiceType, setInvoiceType] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
-  }, [dateRange, invoiceType]);
+  }, [dateRange]);
 
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
       const filters = {
         startDate: dateRange[0].format('YYYY-MM-DD'),
-        endDate: dateRange[1].format('YYYY-MM-DD'),
-        invoice_type: invoiceType
+        endDate: dateRange[1].format('YYYY-MM-DD')
       };
       
       const data = await window.api.getDashboardData(filters);
@@ -87,10 +85,6 @@ const Dashboard = () => {
     if (dates && dates.length === 2) {
       setDateRange(dates);
     }
-  };
-
-  const handleInvoiceTypeChange = (value) => {
-    setInvoiceType(value);
   };
 
   // Prepare chart data
@@ -302,20 +296,8 @@ const Dashboard = () => {
   return (
     <div>
       <Row gutter={[16, 16]} align="middle" className="page-header">
-        <Col span={12}>
+        <Col span={18}>
           <TitleText level={2}>Dashboard</TitleText>
-        </Col>
-        <Col span={6}>
-          <Select
-            placeholder="Fatura Tipi"
-            style={{ width: '100%' }}
-            value={invoiceType || undefined}
-            onChange={handleInvoiceTypeChange}
-            allowClear
-          >
-            <Option value="Alış">Alış</Option>
-            <Option value="Satış">Satış</Option>
-          </Select>
         </Col>
         <Col span={6} style={{ textAlign: 'right' }}>
           <RangePicker
@@ -337,6 +319,7 @@ const Dashboard = () => {
                   value={calculateTotalVat()}
                   prefix={<PercentageOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>
@@ -356,6 +339,7 @@ const Dashboard = () => {
                   value={calculateTotalAmount()}
                   prefix={<DollarOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>
@@ -364,15 +348,38 @@ const Dashboard = () => {
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={24}>
               <Card title="Aylık KDV" className="chart-container">
-                <Bar data={prepareVatByMonthChart()} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: 'top',
+                <div style={{ height: '400px' }}>
+                  <Bar data={prepareVatByMonthChart()} options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: function(value) {
+                            return value.toLocaleString('tr-TR') + ' TL';
+                          }
+                        }
+                      }
                     },
-                  }
-                }} />
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        labels: {
+                          boxWidth: 12,
+                          padding: 15
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                          }
+                        }
+                      }
+                    }
+                  }} />
+                </div>
               </Card>
             </Col>
           </Row>
@@ -380,23 +387,59 @@ const Dashboard = () => {
           <Row gutter={16} style={{ marginTop: 16 }}>
             <Col span={12}>
               <Card title="Para Birimi Dağılımı" className="chart-container">
-                <Pie data={prepareCurrencyDistributionChart()} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                }} />
+                <div style={{ height: '350px' }}>
+                  <Pie data={prepareCurrencyDistributionChart()} options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'right',
+                        labels: {
+                          padding: 20
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            return `${context.label}: ${context.raw} adet`;
+                          }
+                        }
+                      }
+                    }
+                  }} />
+                </div>
               </Card>
             </Col>
             <Col span={12}>
               <Card title="Aylık Toplam" className="chart-container">
-                <Line data={prepareMonthlyTotalsChart()} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: 'top',
+                <div style={{ height: '350px' }}>
+                  <Line data={prepareMonthlyTotalsChart()} options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: function(value) {
+                            return value.toLocaleString('tr-TR') + ' TL';
+                          }
+                        }
+                      }
                     },
-                  }
-                }} />
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function(context) {
+                            return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                          }
+                        }
+                      }
+                    }
+                  }} />
+                </div>
               </Card>
             </Col>
           </Row>
@@ -411,6 +454,7 @@ const Dashboard = () => {
                   value={calculateTotalVat('Alış')}
                   prefix={<PercentageOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>
@@ -430,6 +474,7 @@ const Dashboard = () => {
                   value={calculateTotalAmount('Alış')}
                   prefix={<DollarOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>
@@ -445,6 +490,7 @@ const Dashboard = () => {
                   value={calculateTotalVat('Satış')}
                   prefix={<PercentageOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>
@@ -464,6 +510,7 @@ const Dashboard = () => {
                   value={calculateTotalAmount('Satış')}
                   prefix={<DollarOutlined />}
                   suffix="TL"
+                  precision={2}
                 />
               </Card>
             </Col>

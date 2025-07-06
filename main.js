@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, Tray, dialog } = require('electron');
 const path = require('path');
 const isDev = require('electron-is-dev');
 const fs = require('fs');
@@ -8,6 +8,8 @@ const DatabaseManager = require('./database');
 const db = new DatabaseManager();
 
 let mainWindow;
+let tray = null;
+let isQuitting = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -48,13 +50,133 @@ function createWindow() {
     
   console.log('Loading URL:', startUrl);
 
+  // Hide window instead of closing when user clicks the close button
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      return false;
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
 }
 
+function createTray() {
+  tray = new Tray(path.join(__dirname, isDev ? './public/favicon.ico' : './build/favicon.ico'));
+  
+  const contextMenu = Menu.buildFromTemplate([
+    { 
+      label: 'Aç', 
+      click: () => {
+        if (mainWindow === null) {
+          createWindow();
+        } else {
+          mainWindow.show();
+        }
+      } 
+    },
+    { 
+      label: 'Bilgisayar başlangıcında çalıştır', 
+      type: 'checkbox',
+      checked: isAutostartEnabled(),
+      click: (menuItem) => {
+        toggleAutostart(menuItem.checked);
+      }
+    },
+    { type: 'separator' },
+    { 
+      label: 'Çıkış', 
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      } 
+    }
+  ]);
+  
+  tray.setToolTip('Tax Tracker');
+  tray.setContextMenu(contextMenu);
+  
+  tray.on('click', () => {
+    if (mainWindow === null) {
+      createWindow();
+    } else {
+      mainWindow.show();
+    }
+  });
+}
+
+function isAutostartEnabled() {
+  try {
+    if (process.platform === 'win32') {
+      const startupPath = path.join(process.env.APPDATA, '\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\Tax Tracker.lnk');
+      return fs.existsSync(startupPath);
+    }
+    return false;
+  } catch (error) {
+    console.error('Error checking autostart status:', error);
+    return false;
+  }
+}
+
+function toggleAutostart(enable) {
+  try {
+    const autostartModule = require('./scripts/autostart-setup');
+    
+    if (enable) {
+      autostartModule.setupWindowsAutostart();
+    } else {
+      autostartModule.removeWindowsAutostart();
+    }
+    
+    // Update the menu
+    if (tray) {
+      const contextMenu = Menu.buildFromTemplate([
+        { 
+          label: 'Aç', 
+          click: () => {
+            if (mainWindow === null) {
+              createWindow();
+            } else {
+              mainWindow.show();
+            }
+          } 
+        },
+        { 
+          label: 'Bilgisayar başlangıcında çalıştır', 
+          type: 'checkbox',
+          checked: enable,
+          click: (menuItem) => {
+            toggleAutostart(menuItem.checked);
+          }
+        },
+        { type: 'separator' },
+        { 
+          label: 'Çıkış', 
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          } 
+        }
+      ]);
+      
+      tray.setContextMenu(contextMenu);
+    }
+  } catch (error) {
+    console.error('Error toggling autostart:', error);
+    dialog.showErrorBox('Hata', 'Otomatik başlatma ayarı değiştirilirken bir hata oluştu.');
+  }
+}
+
 app.whenReady().then(() => {
   createWindow();
+  try {
+    createTray();
+  } catch (error) {
+    console.error('Error creating tray:', error);
+  }
   
   // Initialize the database
   try {
@@ -69,9 +191,15 @@ app.whenReady().then(() => {
   });
 });
 
+// Handle the 'before-quit' event to allow the app to quit properly
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
-    app.quit();
+    // Don't quit the app when all windows are closed
+    // The app will continue running in the system tray
   }
 });
 
