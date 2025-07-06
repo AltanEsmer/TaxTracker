@@ -1,0 +1,8 @@
+{
+  "name": "tax-tracker",
+  "version": "1.0.0",
+  "description": "Fatura Kayıt ve KDV Takip Uygulaması",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT"
+}

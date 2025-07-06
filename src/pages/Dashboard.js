@@ -57,8 +57,14 @@ const Dashboard = () => {
     dayjs().startOf('month'),
     dayjs().endOf('month')
   ]);
+  const [activeType, setActiveType] = useState('Tümü'); // 'Tümü', 'Alış', 'Satış'
 
   useEffect(() => {
+    if (!window.api) {
+      setError('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
+      setLoading(false);
+      return;
+    }
     fetchDashboardData();
   }, [dateRange]);
 
@@ -95,9 +101,12 @@ const Dashboard = () => {
         datasets: []
       };
     }
-
+    let data = dashboardData.vatByMonth;
+    if (activeType !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    }
     // Group by month and invoice type
-    const monthGroups = dashboardData.vatByMonth.reduce((acc, item) => {
+    const monthGroups = data.reduce((acc, item) => {
       if (!acc[item.month]) {
         acc[item.month] = [];
       }
@@ -112,7 +121,7 @@ const Dashboard = () => {
     
     // Get unique combinations of currency and invoice type
     const currencyTypeSet = new Set();
-    dashboardData.vatByMonth.forEach(item => {
+    data.forEach(item => {
       currencyTypeSet.add(`${item.currency}-${item.invoice_type || 'Alış'}`);
     });
     
@@ -158,9 +167,12 @@ const Dashboard = () => {
         datasets: []
       };
     }
-
+    let data = dashboardData.currencyDistribution;
+    if (activeType !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    }
     // Group by invoice type
-    const typeGroups = dashboardData.currencyDistribution.reduce((acc, item) => {
+    const typeGroups = data.reduce((acc, item) => {
       const type = item.invoice_type || 'Alış';
       if (!acc[type]) {
         acc[type] = [];
@@ -191,7 +203,7 @@ const Dashboard = () => {
     });
 
     // Get all unique currencies
-    const labels = [...new Set(dashboardData.currencyDistribution.map(item => item.currency))];
+    const labels = [...new Set(data.map(item => item.currency))];
 
     return {
       labels,
@@ -206,9 +218,12 @@ const Dashboard = () => {
         datasets: []
       };
     }
-
+    let data = dashboardData.monthlyTotals;
+    if (activeType !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    }
     // Group by invoice type
-    const typeGroups = dashboardData.monthlyTotals.reduce((acc, item) => {
+    const typeGroups = data.reduce((acc, item) => {
       const type = item.invoice_type || 'Alış';
       if (!acc[type]) {
         acc[type] = [];
@@ -218,7 +233,7 @@ const Dashboard = () => {
     }, {});
 
     // Get all unique months
-    const allMonths = [...new Set(dashboardData.monthlyTotals.map(item => item.month))].sort();
+    const allMonths = [...new Set(data.map(item => item.month))].sort();
 
     const datasets = [];
     
@@ -309,7 +324,11 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      <Tabs defaultActiveKey="all">
+      <Tabs defaultActiveKey="all" onChange={key => {
+        if (key === 'all') setActiveType('Tümü');
+        else if (key === 'buying') setActiveType('Alış');
+        else if (key === 'selling') setActiveType('Satış');
+      }}>
         <TabPane tab="Tümü" key="all">
           <Row gutter={16}>
             <Col span={8}>

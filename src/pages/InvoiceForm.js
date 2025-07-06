@@ -42,6 +42,11 @@ const InvoiceForm = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!window.api) {
+      message.error('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
+      setLoading(false);
+      return;
+    }
     if (id) {
       setIsEditing(true);
       fetchInvoice(id);

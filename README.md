@@ -1,6 +1,19 @@
 # Tax Tracker - Fatura ve KDV Takip Uygulaması
 
-## Kurulum
+## Kurulum Seçenekleri
+
+### Seçenek 1: Portable (Taşınabilir) Uygulama (Önerilen)
+**USB ile taşınabilir, kurulum gerektirmez**
+
+1. `build-simple.bat` dosyasına çift tıklayın (Electron Builder sorunları için alternatif)
+2. Build işlemi tamamlandıktan sonra `release\Tax Tracker-Portable\` klasörünü USB'ye kopyalayın
+3. USB'deki `Tax Tracker-Portable\Tax Tracker.exe` dosyasını çalıştırın
+4. Kurulum yapmaya gerek yoktur
+
+**Not:** Bu yöntem Electron Builder'ın dosya kilitleme sorunlarını atlar ve daha güvenilirdir.
+
+### Seçenek 2: Kurulum Dosyası
+**Kalıcı kurulum için**
 
 1. `Tax Tracker-Setup-1.0.0.exe` dosyasını çalıştırın (release klasöründe bulunmaktadır)
 2. Kurulum otomatik olarak tamamlanacaktır
@@ -19,6 +32,7 @@ Eğer uygulamayı kurmadan çalıştırmak isterseniz:
 - Uygulama kurulduktan sonra masaüstünüzde "Tax Tracker" kısayolu oluşturulacaktır
 - Bu kısayola tıklayarak uygulamayı başlatabilirsiniz
 - Uygulama ayrıca sistem tepsisinde (sağ alt köşede) bir simge olarak görünecektir
+- İlk açılışta otomatik olarak örnek bir fatura ve kur kaydı oluşturulacaktır
 
 ### Sistem Tepsisi (Sağ Alt Köşe) Simgesi
 
@@ -69,6 +83,24 @@ Uygulamanın sistem tepsisindeki simgesine sağ tıklayarak:
 - Uygulamayı tamamen kapatmak için sistem tepsisindeki simgeye sağ tıklayıp "Çıkış" seçeneğini seçin
 - Bilgisayarınızı her açtığınızda uygulamanın otomatik başlaması için sistem tepsisindeki simgeye sağ tıklayıp "Bilgisayar başlangıcında çalıştır" seçeneğini işaretleyin
 
+## Sorun Giderme
+
+### Boş Sayfa Sorunu
+
+Eğer uygulama açıldığında sadece başlık çubuğu görünüyor ve içerik boş görünüyorsa:
+
+1. **Veri Dosyaları Eksik Olabilir**: Uygulama, veri dosyalarını bulamadığında içeriği gösteremeyebilir.
+2. **Çözüm**: 
+   - Uygulamayı kapatın
+   - Tekrar açın
+   - İlk açılışta otomatik olarak örnek veriler oluşturulacaktır
+   - Eğer sorun devam ederse, en az bir fatura ve bir kur kaydı ekleyin
+
+### Veri Konumları
+
+- Geliştirme modunda: `%APPDATA%\Electron\taxtracker-data`
+- Kurulu uygulamada: `%APPDATA%\Tax Tracker\taxtracker-data`
+
 ## Yenilikler
 
 ### Excel Dışa Aktarma İyileştirmeleri
@@ -81,3 +113,4 @@ Uygulamanın sistem tepsisindeki simgesine sağ tıklayarak:
 - Uygulama sistem tepsisinde çalışmaya devam eder
 - Bilgisayar başlangıcında otomatik çalıştırma seçeneği
 - Masaüstü kısayolu ve kolay erişim
+- Otomatik veri taşıma ve örnek veri oluşturma

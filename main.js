@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, Tray, dialog } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
+const isDev = process.defaultApp || /node_modules[\\/]electron[\\/]/.test(process.execPath);
 const fs = require('fs');
 const DatabaseManager = require('./database');
 
@@ -31,21 +31,10 @@ function createWindow() {
     startUrl = 'http://localhost:3000';
     mainWindow.loadURL(startUrl);
   } else {
-    // In production, load from the build directory
-    const indexPath = path.join(__dirname, './build/index.html');
-    const indexPathAlt = path.join(process.resourcesPath, 'app/build/index.html');
-    
-    if (fs.existsSync(indexPath)) {
-      startUrl = `file://${indexPath}`;
-      mainWindow.loadFile(indexPath);
-    } else if (fs.existsSync(indexPathAlt)) {
-      startUrl = `file://${indexPathAlt}`;
-      mainWindow.loadFile(indexPathAlt);
-    } else {
-      console.error('Could not find index.html');
-      app.quit();
-      return;
-    }
+    // In production, load from build directory inside asar/resources
+    const indexPath = path.join(__dirname, 'build', 'index.html');
+    startUrl = `file://${indexPath}`;
+    mainWindow.loadURL(startUrl);
   }
     
   console.log('Loading URL:', startUrl);
@@ -65,47 +54,63 @@ function createWindow() {
 }
 
 function createTray() {
-  tray = new Tray(path.join(__dirname, isDev ? './public/favicon.ico' : './build/favicon.ico'));
-  
-  const contextMenu = Menu.buildFromTemplate([
-    { 
-      label: 'Aç', 
-      click: () => {
-        if (mainWindow === null) {
-          createWindow();
-        } else {
-          mainWindow.show();
+  if (isDev) {
+    console.log('Geliştirme modunda tray simgesi oluşturulmuyor.');
+    return;
+  }
+  let iconPath = path.join(__dirname, 'icon.ico');
+  if (!fs.existsSync(iconPath)) {
+    iconPath = path.join(__dirname, 'build', 'icon.ico');
+  }
+  if (!fs.existsSync(iconPath)) {
+    console.warn('Custom tray icon not found, using default Electron icon.');
+    iconPath = undefined;
+  }
+  try {
+    tray = new Tray(iconPath);
+    
+    const contextMenu = Menu.buildFromTemplate([
+      { 
+        label: 'Aç', 
+        click: () => {
+          if (mainWindow === null) {
+            createWindow();
+          } else {
+            mainWindow.show();
+          }
+        } 
+      },
+      { 
+        label: 'Bilgisayar başlangıcında çalıştır', 
+        type: 'checkbox',
+        checked: isAutostartEnabled(),
+        click: (menuItem) => {
+          toggleAutostart(menuItem.checked);
         }
-      } 
-    },
-    { 
-      label: 'Bilgisayar başlangıcında çalıştır', 
-      type: 'checkbox',
-      checked: isAutostartEnabled(),
-      click: (menuItem) => {
-        toggleAutostart(menuItem.checked);
+      },
+      { type: 'separator' },
+      { 
+        label: 'Çıkış', 
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        } 
       }
-    },
-    { type: 'separator' },
-    { 
-      label: 'Çıkış', 
-      click: () => {
-        isQuitting = true;
-        app.quit();
-      } 
-    }
-  ]);
-  
-  tray.setToolTip('Tax Tracker');
-  tray.setContextMenu(contextMenu);
-  
-  tray.on('click', () => {
-    if (mainWindow === null) {
-      createWindow();
-    } else {
-      mainWindow.show();
-    }
-  });
+    ]);
+    
+    tray.setToolTip('Tax Tracker');
+    tray.setContextMenu(contextMenu);
+    
+    tray.on('click', () => {
+      if (mainWindow === null) {
+        createWindow();
+      } else {
+        mainWindow.show();
+      }
+    });
+  } catch (error) {
+    console.error('Error creating tray:', error);
+  }
 }
 
 function isAutostartEnabled() {

@@ -8,8 +8,24 @@ class DatabaseManager {
     this.userDataPath = app.getPath('userData');
     this.dbPath = path.join(this.userDataPath, 'taxtracker-data');
     
+    // MIGRATION: If this is the first run in production, copy dev data if it exists
+    const devDataPath = path.join(app.getPath('appData'), 'Electron', 'taxtracker-data');
     if (!fs.existsSync(this.dbPath)) {
-      fs.mkdirSync(this.dbPath, { recursive: true });
+      if (fs.existsSync(devDataPath)) {
+        fs.mkdirSync(this.dbPath, { recursive: true });
+        const devInvoices = path.join(devDataPath, 'invoices.json');
+        const devFxRates = path.join(devDataPath, 'fxrates.json');
+        if (fs.existsSync(devInvoices)) {
+          fs.copyFileSync(devInvoices, path.join(this.dbPath, 'invoices.json'));
+          console.log('Migrated invoices.json from dev folder.');
+        }
+        if (fs.existsSync(devFxRates)) {
+          fs.copyFileSync(devFxRates, path.join(this.dbPath, 'fxrates.json'));
+          console.log('Migrated fxrates.json from dev folder.');
+        }
+      } else {
+        fs.mkdirSync(this.dbPath, { recursive: true });
+      }
     }
     
     this.invoicesPath = path.join(this.dbPath, 'invoices.json');
@@ -76,10 +92,62 @@ class DatabaseManager {
     try {
       // Just make sure the files exist
       this.loadData();
+      
+      // Check if both dev and production data folders are empty
+      const devDataPath = path.join(app.getPath('appData'), 'Electron', 'taxtracker-data');
+      const devInvoicesPath = path.join(devDataPath, 'invoices.json');
+      const devFxRatesPath = path.join(devDataPath, 'fxrates.json');
+      
+      const noDevData = !fs.existsSync(devInvoicesPath) && !fs.existsSync(devFxRatesPath);
+      const noProdData = this.invoices.length === 0 && this.fxRates.length === 0;
+      
+      // If both locations are empty, create sample data
+      if (noDevData && noProdData) {
+        console.log('No data found in either location. Creating sample data...');
+        this.createSampleData();
+      }
+      
       return true;
     } catch (error) {
       console.error('Error initializing database:', error);
       throw error;
+    }
+  }
+  
+  createSampleData() {
+    try {
+      // Create a sample invoice
+      const sampleInvoice = {
+        id: 1,
+        date: new Date().toISOString().split('T')[0],
+        company: 'Örnek Şirket A.Ş.',
+        amount: 1000,
+        vat_rate: 18,
+        vat_amount: 180,
+        currency: 'TRY',
+        invoice_type: 'Alış',
+        description: 'Örnek fatura'
+      };
+      
+      this.invoices.push(sampleInvoice);
+      this.saveInvoices();
+      
+      // Create a sample FX rate
+      const today = new Date();
+      const sampleFxRate = {
+        id: 1,
+        year: today.getFullYear(),
+        month: today.getMonth() + 1,
+        usd_rate: 30.5,
+        eur_rate: 33.2
+      };
+      
+      this.fxRates.push(sampleFxRate);
+      this.saveFxRates();
+      
+      console.log('Sample data created successfully');
+    } catch (error) {
+      console.error('Error creating sample data:', error);
     }
   }
 

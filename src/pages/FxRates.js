@@ -33,6 +33,11 @@ const FxRates = () => {
   const [months, setMonths] = useState([]);
   
   useEffect(() => {
+    if (!window.api) {
+      message.error('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
+      setLoading(false);
+      return;
+    }
     // Generate years (current year and 5 years back)
     const currentYear = new Date().getFullYear();
     const yearOptions = [];

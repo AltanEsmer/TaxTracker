@@ -1,0 +1,30 @@
+{
+  "name": "tax-tracker",
+  "version": "1.0.0",
+  "description": "Fatura Kayıt ve KDV Takip Uygulaması",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ant-design/icons": "^5.0.1",
+    "antd": "^5.3.0",
+    "chart.js": "^4.2.1",
+    "dayjs": "^1.11.7",
+    "electron-is-dev": "^2.0.0",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.2",
+    "react-scripts": "5.0.1",
+    "xlsx": "^0.18.5"
+  },
+  "browserslist": {
+    "production": [
+      "last 1 electron version"
+    ],
+    "development": [
+      "last 1 electron version"
+    ]
+  },
+  "homepage": "./"
+}

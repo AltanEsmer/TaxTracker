@@ -52,6 +52,11 @@ const InvoiceList = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!window.api) {
+      message.error('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
+      setLoading(false);
+      return;
+    }
     fetchInvoices();
   }, []);
 
@@ -189,155 +194,87 @@ const InvoiceList = () => {
   };
 
   const exportToExcel = () => {
-    // Create data for export
+    if (invoices.length === 0) {
+      message.warning('Aktarılacak fatura bulunamadı.');
+      return;
+    }
+
+    // Prepare data for export (columns as in the image)
     const exportData = invoices.map(invoice => {
       const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
-      
-      // Get TRY equivalents
-      const trySubtotal = invoice.try_equivalent ? invoice.try_equivalent.subtotal : 0;
-      const tryVatAmount = invoice.try_equivalent ? invoice.try_equivalent.vat_amount : 0;
-      const tryTotal = invoice.try_equivalent ? invoice.try_equivalent.total : 0;
-      
+      let trySubtotal = 0, tryVatAmount = 0, tryTotal = 0;
+      if (invoice.try_equivalent && invoice.try_equivalent.total) {
+        trySubtotal = invoice.try_equivalent.subtotal || 0;
+        tryVatAmount = invoice.try_equivalent.vat_amount || 0;
+        tryTotal = invoice.try_equivalent.total || 0;
+      } else {
+        let conversionRate = 1;
+        if (invoice.currency === 'USD') conversionRate = 30;
+        else if (invoice.currency === 'EUR') conversionRate = 32;
+        trySubtotal = invoice.subtotal * conversionRate;
+        tryVatAmount = vatAmount * conversionRate;
+        tryTotal = invoice.total * conversionRate;
+      }
       return {
         'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
-        'Fatura Tipi': invoice.invoice_type || 'Alış',
+        'Fatura Tip': invoice.invoice_type || 'Alış',
         'Şirket': invoice.company,
         'Fatura No': invoice.invoice_no,
-        'Para Birimi': invoice.currency,
-        'Ara Toplam': invoice.subtotal.toFixed(2),
-        'KDV Oranı (%)': invoice.vat_rate,
-        'KDV Tutarı': vatAmount.toFixed(2),
-        'Genel Toplam': invoice.total.toFixed(2),
-        'Ara Toplam (TL)': trySubtotal.toFixed(2),
-        'KDV Tutarı (TL)': tryVatAmount.toFixed(2),
-        'Genel Toplam (TL)': tryTotal.toFixed(2)
+        'Para Birim': invoice.currency,
+        'Ara Toplam': invoice.subtotal,
+        'KDV Oranı': invoice.vat_rate,
+        'KDV Tutar': vatAmount,
+        'Genel Top': invoice.total,
+        'Ara Toplam (TL)': trySubtotal,
+        'KDV Tutar (TL)': tryVatAmount,
+        'Genel Toplam (TL)': tryTotal
       };
     });
-    
-    // Group invoices by type
-    const alisFaturalari = invoices.filter(inv => (inv.invoice_type || 'Alış') === 'Alış');
-    const satisFaturalari = invoices.filter(inv => inv.invoice_type === 'Satış');
-    
-    // Calculate totals by type
-    const alisTotals = calculateTotals(alisFaturalari);
-    const satisTotals = calculateTotals(satisFaturalari);
-    
-    // Create worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    
-    // Set column widths
-    const wscols = [
-      { wch: 12 },  // Tarih
-      { wch: 10 },  // Fatura Tipi
-      { wch: 30 },  // Şirket
-      { wch: 15 },  // Fatura No
-      { wch: 10 },  // Para Birimi
-      { wch: 12 },  // Ara Toplam
-      { wch: 12 },  // KDV Oranı
-      { wch: 12 },  // KDV Tutarı
-      { wch: 14 },  // Genel Toplam
-      { wch: 15 },  // Ara Toplam (TL)
-      { wch: 15 },  // KDV Tutarı (TL)
-      { wch: 16 }   // Genel Toplam (TL)
-    ];
-    ws['!cols'] = wscols;
-    
-    // Add a header style
-    const headerStyle = {
-      font: { bold: true, color: { rgb: "FFFFFF" } },
-      fill: { fgColor: { rgb: "4472C4" } },
-      alignment: { horizontal: "center", vertical: "center" }
-    };
-    
-    // Add a total row style
-    const totalStyle = {
-      font: { bold: true },
-      fill: { fgColor: { rgb: "E2EFDA" } }
-    };
-    
-    // Apply styles to header row
-    const headerRange = XLSX.utils.decode_range(ws['!ref']);
-    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-      const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!ws[headerCell]) continue;
-      if (!ws[headerCell].s) ws[headerCell].s = {};
-      ws[headerCell].s = headerStyle;
-    }
-    
-    // Add a total row with style
-    const totalRowIndex = exportData.length;
+
+    // Calculate totals for TL columns
     const totalRow = {
-      'Tarih': 'TOPLAM',
-      'Fatura Tipi': '',
+      'Tarih': '',
+      'Fatura Tip': '',
       'Şirket': '',
       'Fatura No': '',
-      'Para Birimi': '',
+      'Para Birim': '',
       'Ara Toplam': '',
-      'KDV Oranı (%)': '',
-      'KDV Tutarı': '',
-      'Genel Toplam': '',
-      'Ara Toplam (TL)': totals.subtotal.toFixed(2),
-      'KDV Tutarı (TL)': totals.vatAmount.toFixed(2),
-      'Genel Toplam (TL)': totals.total.toFixed(2)
+      'KDV Oranı': '',
+      'KDV Tutar': '',
+      'Genel Top': '',
+      'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0),
+      'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0),
+      'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0)
     };
-    
-    // Add the total row
-    XLSX.utils.sheet_add_json(ws, [totalRow], { skipHeader: true, origin: totalRowIndex });
-    
-    // Apply total row style
-    for (let C = headerRange.s.c; C <= headerRange.e.c; ++C) {
-      const totalCell = XLSX.utils.encode_cell({ r: totalRowIndex, c: C });
-      if (!ws[totalCell]) continue;
-      if (!ws[totalCell].s) ws[totalCell].s = {};
-      ws[totalCell].s = totalStyle;
-    }
-    
-    // Create a summary sheet
-    const summaryData = [
-      { 'Fatura Tipi': 'Alış Faturaları', 'Fatura Sayısı': alisFaturalari.length, 'Toplam Tutar (TL)': alisTotals.total.toFixed(2), 'Toplam KDV (TL)': alisTotals.vatAmount.toFixed(2) },
-      { 'Fatura Tipi': 'Satış Faturaları', 'Fatura Sayısı': satisFaturalari.length, 'Toplam Tutar (TL)': satisTotals.total.toFixed(2), 'Toplam KDV (TL)': satisTotals.vatAmount.toFixed(2) },
-      { 'Fatura Tipi': 'GENEL TOPLAM', 'Fatura Sayısı': invoices.length, 'Toplam Tutar (TL)': totals.total.toFixed(2), 'Toplam KDV (TL)': totals.vatAmount.toFixed(2) }
+
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    // Add total row
+    XLSX.utils.sheet_add_json(ws, [totalRow], { skipHeader: true, origin: exportData.length });
+
+    // Set column widths for readability
+    ws['!cols'] = [
+      { wch: 12 }, // Tarih
+      { wch: 10 }, // Fatura Tip
+      { wch: 20 }, // Şirket
+      { wch: 15 }, // Fatura No
+      { wch: 10 }, // Para Birim
+      { wch: 12 }, // Ara Toplam
+      { wch: 10 }, // KDV Oranı
+      { wch: 12 }, // KDV Tutar
+      { wch: 12 }, // Genel Top
+      { wch: 16 }, // Ara Toplam (TL)
+      { wch: 16 }, // KDV Tutar (TL)
+      { wch: 16 }  // Genel Toplam (TL)
     ];
-    
-    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-    
-    // Set summary column widths
-    const wsSummaryCols = [
-      { wch: 20 },  // Fatura Tipi
-      { wch: 15 },  // Fatura Sayısı
-      { wch: 20 },  // Toplam Tutar
-      { wch: 20 }   // Toplam KDV
-    ];
-    wsSummary['!cols'] = wsSummaryCols;
-    
-    // Apply styles to summary header
-    const summaryHeaderRange = XLSX.utils.decode_range(wsSummary['!ref']);
-    for (let C = summaryHeaderRange.s.c; C <= summaryHeaderRange.e.c; ++C) {
-      const headerCell = XLSX.utils.encode_cell({ r: 0, c: C });
-      if (!wsSummary[headerCell]) continue;
-      if (!wsSummary[headerCell].s) wsSummary[headerCell].s = {};
-      wsSummary[headerCell].s = headerStyle;
-    }
-    
-    // Apply style to the total row in summary
-    for (let C = summaryHeaderRange.s.c; C <= summaryHeaderRange.e.c; ++C) {
-      const totalCell = XLSX.utils.encode_cell({ r: 2, c: C });
-      if (!wsSummary[totalCell]) continue;
-      if (!wsSummary[totalCell].s) wsSummary[totalCell].s = {};
-      wsSummary[totalCell].s = totalStyle;
-    }
-    
+
     // Create workbook
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, wsSummary, 'Özet');
     XLSX.utils.book_append_sheet(wb, ws, 'Faturalar');
-    
+
     // Generate file name with date
     const fileName = `Faturalar_${dayjs().format('YYYY-MM-DD')}.xlsx`;
-    
-    // Export to file
     XLSX.writeFile(wb, fileName);
-    
     message.success(`Faturalar başarıyla ${fileName} dosyasına aktarıldı.`);
   };
 

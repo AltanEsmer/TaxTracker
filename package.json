@@ -12,20 +12,22 @@
     "clean": "node scripts/clean.js",
     "prebuild": "npm run clean",
     "build": "npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml",
-    "pack": "electron-builder --dir --config electron-builder.yml",
-    "dist": "npm run clean && npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml",
-    "build-installer": "npm run clean && npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml --win"
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "make-portable": "npm run react-build && npm run postbuild && electron-forge make --targets=@electron-forge/maker-zip"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@electron-forge/cli": "^7.8.1",
+    "@electron-forge/maker-squirrel": "^7.8.1",
+    "@electron-forge/maker-zip": "^7.8.1",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^13.4.0",
     "@testing-library/user-event": "^13.5.0",
     "concurrently": "^7.6.0",
     "cross-env": "^7.0.3",
-    "electron": "^22.0.0",
-    "electron-builder": "^23.6.0",
+    "electron": "^22.3.27",
     "wait-on": "^7.0.1"
   },
   "dependencies": {
@@ -49,5 +51,29 @@
       "last 1 electron version"
     ]
   },
-  "homepage": "./"
+  "homepage": "./",
+  "config": {
+    "forge": {
+      "packagerConfig": {
+        "icon": "icon.ico",
+        "asar": true
+      },
+      "makers": [
+        {
+          "name": "@electron-forge/maker-zip",
+          "platforms": [
+            "win32"
+          ]
+        },
+        {
+          "name": "@electron-forge/maker-squirrel",
+          "config": {
+            "name": "Tax Tracker",
+            "iconUrl": "icon.ico",
+            "setupIcon": "icon.ico"
+          }
+        }
+      ]
+    }
+  }
 }
