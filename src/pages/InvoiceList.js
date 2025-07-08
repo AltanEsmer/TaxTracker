@@ -63,7 +63,14 @@ const InvoiceList = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
+      console.log('Fetching invoices with filters:', filters);
       const data = await window.api.getInvoices(filters);
+      
+      console.log('Raw invoice data received:', data.length, 'records');
+      
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format received from API');
+      }
       
       // Sort by invoice type and date
       const sortedData = [...data].sort((a, b) => {
@@ -78,53 +85,69 @@ const InvoiceList = () => {
         return new Date(b.date) - new Date(a.date);
       });
       
+      console.log('Sorted invoice data:', sortedData.length, 'records');
       setInvoices(sortedData);
       calculateTotals(sortedData);
     } catch (error) {
       console.error('Error fetching invoices:', error);
-      message.error('Faturalar yüklenirken bir hata oluştu.');
+      message.error('Faturalar yüklenirken bir hata oluştu: ' + error.message);
+      setInvoices([]);
+      setTotals({ subtotal: 0, vatAmount: 0, total: 0 });
     } finally {
       setLoading(false);
     }
   };
 
   const calculateTotals = (invoiceData) => {
+    if (!Array.isArray(invoiceData) || invoiceData.length === 0) {
+      setTotals({ subtotal: 0, vatAmount: 0, total: 0 });
+      return;
+    }
+    
     let subtotalSum = 0;
     let vatAmountSum = 0;
     let totalSum = 0;
 
-    invoiceData.forEach(invoice => {
-      // Use TRY equivalent values if available
-      if (invoice.try_equivalent && invoice.try_equivalent.total) {
-        subtotalSum += invoice.try_equivalent.subtotal || 0;
-        vatAmountSum += invoice.try_equivalent.vat_amount || 0;
-        totalSum += invoice.try_equivalent.total || 0;
-        
-        console.log('Using TRY equivalent for invoice:', invoice.invoice_no, 
-                    'TRY Total:', invoice.try_equivalent.total);
-      } else {
-        // Fallback to calculating based on currency conversion
-        const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
-        
-        // Apply conversion if needed
-        let conversionRate = 1; // Default for TRY
-        if (invoice.currency === 'USD') {
-          // Use a fallback rate if not available
-          conversionRate = 30; // Fallback rate
-        } else if (invoice.currency === 'EUR') {
-          // Use a fallback rate if not available
-          conversionRate = 32; // Fallback rate
+    invoiceData.forEach((invoice, index) => {
+      try {
+        // Use TRY equivalent values if available
+        if (invoice.try_equivalent && invoice.try_equivalent.total) {
+          subtotalSum += Number(invoice.try_equivalent.subtotal) || 0;
+          vatAmountSum += Number(invoice.try_equivalent.vat_amount) || 0;
+          totalSum += Number(invoice.try_equivalent.total) || 0;
+          
+          console.log(`Invoice ${index + 1}: Using TRY equivalent for invoice:`, invoice.invoice_no, 
+                      'TRY Total:', invoice.try_equivalent.total);
+        } else {
+          // Fallback to calculating based on currency conversion
+          const subtotal = Number(invoice.subtotal) || 0;
+          const vatRate = Number(invoice.vat_rate) || 0;
+          const vatAmount = subtotal * (vatRate / 100);
+          
+          // Apply conversion if needed
+          let conversionRate = 1; // Default for TRY
+          if (invoice.currency === 'USD') {
+            // Use a fallback rate if not available
+            conversionRate = 30; // Fallback rate
+          } else if (invoice.currency === 'EUR') {
+            // Use a fallback rate if not available
+            conversionRate = 32; // Fallback rate
+          }
+          
+          subtotalSum += subtotal * conversionRate;
+          vatAmountSum += vatAmount * conversionRate;
+          totalSum += Number(invoice.total || 0) * conversionRate;
+          
+          console.log(`Invoice ${index + 1}: Using fallback conversion for invoice:`, invoice.invoice_no, 
+                      'Currency:', invoice.currency, 'Rate:', conversionRate, 
+                      'Original Total:', invoice.total, 'TRY Total:', Number(invoice.total || 0) * conversionRate);
         }
-        
-        subtotalSum += invoice.subtotal * conversionRate;
-        vatAmountSum += vatAmount * conversionRate;
-        totalSum += invoice.total * conversionRate;
-        
-        console.log('Using fallback conversion for invoice:', invoice.invoice_no, 
-                    'Currency:', invoice.currency, 'Rate:', conversionRate, 
-                    'Original Total:', invoice.total, 'TRY Total:', invoice.total * conversionRate);
+      } catch (error) {
+        console.error(`Error calculating totals for invoice ${index + 1}:`, error);
       }
     });
+
+    console.log('Final totals calculated:', { subtotalSum, vatAmountSum, totalSum });
 
     setTotals({
       subtotal: subtotalSum,
@@ -199,83 +222,102 @@ const InvoiceList = () => {
       return;
     }
 
-    // Prepare data for export (columns as in the image)
-    const exportData = invoices.map(invoice => {
-      const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
-      let trySubtotal = 0, tryVatAmount = 0, tryTotal = 0;
-      if (invoice.try_equivalent && invoice.try_equivalent.total) {
-        trySubtotal = invoice.try_equivalent.subtotal || 0;
-        tryVatAmount = invoice.try_equivalent.vat_amount || 0;
-        tryTotal = invoice.try_equivalent.total || 0;
-      } else {
-        let conversionRate = 1;
-        if (invoice.currency === 'USD') conversionRate = 30;
-        else if (invoice.currency === 'EUR') conversionRate = 32;
-        trySubtotal = invoice.subtotal * conversionRate;
-        tryVatAmount = vatAmount * conversionRate;
-        tryTotal = invoice.total * conversionRate;
-      }
-      return {
-        'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
-        'Fatura Tip': invoice.invoice_type || 'Alış',
-        'Şirket': invoice.company,
-        'Fatura No': invoice.invoice_no,
-        'Para Birim': invoice.currency,
-        'Ara Toplam': invoice.subtotal,
-        'KDV Oranı': invoice.vat_rate,
-        'KDV Tutar': vatAmount,
-        'Genel Top': invoice.total,
-        'Ara Toplam (TL)': trySubtotal,
-        'KDV Tutar (TL)': tryVatAmount,
-        'Genel Toplam (TL)': tryTotal
+    try {
+      console.log('Exporting invoices:', invoices.length, 'records');
+      
+      // Prepare data for export (columns as in the image)
+      const exportData = invoices.map((invoice, index) => {
+        const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
+        let trySubtotal = 0, tryVatAmount = 0, tryTotal = 0;
+        
+        if (invoice.try_equivalent && invoice.try_equivalent.total) {
+          trySubtotal = invoice.try_equivalent.subtotal || 0;
+          tryVatAmount = invoice.try_equivalent.vat_amount || 0;
+          tryTotal = invoice.try_equivalent.total || 0;
+        } else {
+          let conversionRate = 1;
+          if (invoice.currency === 'USD') conversionRate = 30;
+          else if (invoice.currency === 'EUR') conversionRate = 32;
+          trySubtotal = invoice.subtotal * conversionRate;
+          tryVatAmount = vatAmount * conversionRate;
+          tryTotal = invoice.total * conversionRate;
+        }
+        
+        const row = {
+          'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
+          'Fatura Tip': invoice.invoice_type || 'Alış',
+          'Şirket': invoice.company,
+          'Fatura No': invoice.invoice_no,
+          'Para Birim': invoice.currency,
+          'Ara Toplam': invoice.subtotal,
+          'KDV Oranı': invoice.vat_rate,
+          'KDV Tutar': vatAmount,
+          'Genel Top': invoice.total,
+          'Ara Toplam (TL)': trySubtotal,
+          'KDV Tutar (TL)': tryVatAmount,
+          'Genel Toplam (TL)': tryTotal
+        };
+        
+        console.log(`Row ${index + 1}:`, row);
+        return row;
+      });
+
+      console.log('Export data prepared:', exportData.length, 'rows');
+
+      // Calculate totals for TL columns
+      const totalRow = {
+        'Tarih': '',
+        'Fatura Tip': '',
+        'Şirket': '',
+        'Fatura No': '',
+        'Para Birim': '',
+        'Ara Toplam': '',
+        'KDV Oranı': '',
+        'KDV Tutar': '',
+        'Genel Top': '',
+        'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0),
+        'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0),
+        'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0)
       };
-    });
 
-    // Calculate totals for TL columns
-    const totalRow = {
-      'Tarih': '',
-      'Fatura Tip': '',
-      'Şirket': '',
-      'Fatura No': '',
-      'Para Birim': '',
-      'Ara Toplam': '',
-      'KDV Oranı': '',
-      'KDV Tutar': '',
-      'Genel Top': '',
-      'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0),
-      'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0),
-      'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0)
-    };
+      console.log('Total row:', totalRow);
 
-    // Create worksheet
-    const ws = XLSX.utils.json_to_sheet(exportData);
-    // Add total row
-    XLSX.utils.sheet_add_json(ws, [totalRow], { skipHeader: true, origin: exportData.length });
+      // Create worksheet
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      
+      // Add total row
+      XLSX.utils.sheet_add_json(ws, [totalRow], { skipHeader: true, origin: exportData.length + 1 });
 
-    // Set column widths for readability
-    ws['!cols'] = [
-      { wch: 12 }, // Tarih
-      { wch: 10 }, // Fatura Tip
-      { wch: 20 }, // Şirket
-      { wch: 15 }, // Fatura No
-      { wch: 10 }, // Para Birim
-      { wch: 12 }, // Ara Toplam
-      { wch: 10 }, // KDV Oranı
-      { wch: 12 }, // KDV Tutar
-      { wch: 12 }, // Genel Top
-      { wch: 16 }, // Ara Toplam (TL)
-      { wch: 16 }, // KDV Tutar (TL)
-      { wch: 16 }  // Genel Toplam (TL)
-    ];
+      // Set column widths for readability
+      ws['!cols'] = [
+        { wch: 12 }, // Tarih
+        { wch: 10 }, // Fatura Tip
+        { wch: 20 }, // Şirket
+        { wch: 15 }, // Fatura No
+        { wch: 10 }, // Para Birim
+        { wch: 12 }, // Ara Toplam
+        { wch: 10 }, // KDV Oranı
+        { wch: 12 }, // KDV Tutar
+        { wch: 12 }, // Genel Top
+        { wch: 16 }, // Ara Toplam (TL)
+        { wch: 16 }, // KDV Tutar (TL)
+        { wch: 16 }  // Genel Toplam (TL)
+      ];
 
-    // Create workbook
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Faturalar');
+      // Create workbook
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Faturalar');
 
-    // Generate file name with date
-    const fileName = `Faturalar_${dayjs().format('YYYY-MM-DD')}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-    message.success(`Faturalar başarıyla ${fileName} dosyasına aktarıldı.`);
+      // Generate file name with date
+      const fileName = `Faturalar_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+      
+      console.log('Excel file created successfully:', fileName);
+      message.success(`Faturalar başarıyla ${fileName} dosyasına aktarıldı. (${exportData.length} satır)`);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      message.error('Excel dosyası oluşturulurken bir hata oluştu: ' + error.message);
+    }
   };
 
   const columns = [

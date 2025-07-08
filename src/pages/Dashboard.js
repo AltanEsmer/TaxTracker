@@ -66,7 +66,7 @@ const Dashboard = () => {
       return;
     }
     fetchDashboardData();
-  }, [dateRange]);
+  }, [dateRange, activeType]);
 
   const fetchDashboardData = async () => {
     try {
@@ -76,12 +76,30 @@ const Dashboard = () => {
         endDate: dateRange[1].format('YYYY-MM-DD')
       };
       
+      console.log('Fetching dashboard data with filters:', filters);
       const data = await window.api.getDashboardData(filters);
-      setDashboardData(data);
+      
+      console.log('Dashboard data received:', data);
+      
+      // Validate data structure
+      if (!data) {
+        throw new Error('No data received from API');
+      }
+      
+      // Ensure all required arrays exist
+      const validatedData = {
+        vatByMonth: data.vatByMonth || [],
+        currencyDistribution: data.currencyDistribution || [],
+        monthlyTotals: data.monthlyTotals || []
+      };
+      
+      console.log('Validated dashboard data:', validatedData);
+      setDashboardData(validatedData);
       setError(null);
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
-      setError('Veri yüklenirken bir hata oluştu.');
+      setError('Veri yüklenirken bir hata oluştu: ' + err.message);
+      setDashboardData(null);
     } finally {
       setLoading(false);
     }
@@ -105,6 +123,21 @@ const Dashboard = () => {
     if (activeType !== 'Tümü') {
       data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
     }
+    
+    console.log('VAT chart data for type:', activeType, 'records:', data.length);
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'KDV',
+          data: [0],
+          backgroundColor: 'rgba(200, 200, 200, 0.6)'
+        }]
+      };
+    }
+    
     // Group by month and invoice type
     const monthGroups = data.reduce((acc, item) => {
       if (!acc[item.month]) {
@@ -171,6 +204,20 @@ const Dashboard = () => {
     if (activeType !== 'Tümü') {
       data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
     }
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'Dağılım',
+          data: [1],
+          backgroundColor: ['rgba(200, 200, 200, 0.6)'],
+          borderColor: ['rgba(200, 200, 200, 1)']
+        }]
+      };
+    }
+    
     // Group by invoice type
     const typeGroups = data.reduce((acc, item) => {
       const type = item.invoice_type || 'Alış';
@@ -222,6 +269,21 @@ const Dashboard = () => {
     if (activeType !== 'Tümü') {
       data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
     }
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'Toplam',
+          data: [0],
+          borderColor: 'rgba(200, 200, 200, 1)',
+          backgroundColor: 'rgba(200, 200, 200, 0.2)',
+          tension: 0.4,
+        }]
+      };
+    }
+    
     // Group by invoice type
     const typeGroups = data.reduce((acc, item) => {
       const type = item.invoice_type || 'Alış';
@@ -270,7 +332,10 @@ const Dashboard = () => {
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    const total = filteredData.reduce((sum, item) => sum + Number(item.vat_amount), 0);
+    const total = filteredData.reduce((sum, item) => {
+      const vatAmount = Number(item.vat_amount) || 0;
+      return sum + vatAmount;
+    }, 0);
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
@@ -282,16 +347,22 @@ const Dashboard = () => {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
     
-    return filteredData.reduce((sum, item) => sum + Number(item.count), 0);
+    return filteredData.reduce((sum, item) => {
+      const count = Number(item.count) || 0;
+      return sum + count;
+    }, 0);
   };
 
   const calculateTotalAmount = (type = null) => {
-    if (!dashboardData || !dashboardData.currencyDistribution) return '0.00';
-    let filteredData = dashboardData.currencyDistribution;
+    if (!dashboardData || !dashboardData.monthlyTotals) return '0.00';
+    let filteredData = dashboardData.monthlyTotals;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    const total = filteredData.reduce((sum, item) => sum + Number(item.total_amount), 0);
+    const total = filteredData.reduce((sum, item) => {
+      const amount = Number(item.total_amount) || 0;
+      return sum + amount;
+    }, 0);
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
@@ -319,11 +390,20 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      <Tabs defaultActiveKey="all" onChange={key => {
-        if (key === 'all') setActiveType('Tümü');
-        else if (key === 'buying') setActiveType('Alış');
-        else if (key === 'selling') setActiveType('Satış');
-      }}>
+      <Tabs 
+        defaultActiveKey="all" 
+        activeKey={activeType === 'Tümü' ? 'all' : activeType === 'Alış' ? 'buying' : 'selling'}
+        onChange={key => {
+          console.log('Tab changed to:', key);
+          if (key === 'all') {
+            setActiveType('Tümü');
+          } else if (key === 'buying') {
+            setActiveType('Alış');
+          } else if (key === 'selling') {
+            setActiveType('Satış');
+          }
+        }}
+      >
         <TabPane tab="Tümü" key="all">
           <Row gutter={16}>
             <Col span={8}>

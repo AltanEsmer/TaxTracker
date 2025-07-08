@@ -40,6 +40,36 @@ body {
   margin: 0 auto;
 }
 
+/* Form field improvements */
+.form-container .ant-form-item-label > label {
+  font-weight: 500;
+  color: #262626;
+}
+
+.form-container .ant-form-item-label > label.ant-form-item-required::before {
+  color: #ff4d4f;
+}
+
+/* Highlight KDV and Currency fields */
+.form-container .ant-form-item:has([name="vat_rate"]) .ant-form-item-label > label,
+.form-container .ant-form-item:has([name="currency"]) .ant-form-item-label > label {
+  font-weight: 600;
+  color: #1890ff;
+}
+
+.form-container .ant-form-item:has([name="vat_rate"]) .ant-select,
+.form-container .ant-form-item:has([name="currency"]) .ant-select {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
+}
+
+/* Small text styling for TL equivalents */
+.form-container small {
+  font-size: 12px;
+  color: #8c8c8c;
+  line-height: 1.4;
+}
+
 .chart-container {
   margin-bottom: 24px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.09);
@@ -77,4 +107,25 @@ body {
 
 .page-header {
   margin-bottom: 24px;
+}
+
+/* Invoice type separator styling */
+.invoice-type-separator td {
+  border-top: 3px solid #f0f0f0 !important;
+  background-color: #fafafa;
+}
+
+.invoice-type-separator:hover td {
+  border-top: 3px solid #e6f7ff !important;
+  background-color: #f0f8ff;
+}
+
+/* Table improvements */
+.ant-table-thead > tr > th {
+  background-color: #fafafa;
+  font-weight: 600;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background-color: #f5f5f5;
 } 

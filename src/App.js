@@ -19,7 +19,7 @@ function App() {
   return (
     <Layout className="layout" style={{ minHeight: '100vh' }}>
       <Header>
-        <div className="logo">Tax Tracker</div>
+        <div className="logo">Ales</div>
         <Menu
           theme="dark"
           mode="horizontal"

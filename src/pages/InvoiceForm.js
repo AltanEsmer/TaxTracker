@@ -244,6 +244,24 @@ const InvoiceForm = () => {
             <Row gutter={16}>
               <Col span={6}>
                 <Form.Item
+                  name="company"
+                  label="Şirket İsmi"
+                  rules={[{ required: true, message: 'Lütfen şirket ismi girin' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
+                  name="invoice_no"
+                  label="Fatura No"
+                  rules={[{ required: true, message: 'Lütfen fatura numarası girin' }]}
+                >
+                  <Input />
+                </Form.Item>
+              </Col>
+              <Col span={6}>
+                <Form.Item
                   name="date"
                   label="Tarih"
                   rules={[{ required: true, message: 'Lütfen tarih seçin' }]}
@@ -266,23 +284,46 @@ const InvoiceForm = () => {
                   </Select>
                 </Form.Item>
               </Col>
-              <Col span={6}>
+            </Row>
+
+            <Row gutter={16}>
+              <Col span={12}>
                 <Form.Item
-                  name="company"
-                  label="Şirket İsmi"
-                  rules={[{ required: true, message: 'Lütfen şirket ismi girin' }]}
+                  name="vat_rate"
+                  label="KDV Oranı (%)"
+                  rules={[{ required: true, message: 'Lütfen KDV oranı girin' }]}
                 >
-                  <Input />
+                  <Select onChange={calculateTotal}>
+                    <Option value={0}>0%</Option>
+                    <Option value={5}>5%</Option>
+                    <Option value={10}>10%</Option>
+                    <Option value={16}>16%</Option>
+                    <Option value={20}>20%</Option>
+                  </Select>
                 </Form.Item>
+                <div style={{ marginTop: -15, marginBottom: 16 }}>
+                  <small style={{ color: '#888' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
+                </div>
               </Col>
-              <Col span={6}>
+              <Col span={12}>
                 <Form.Item
-                  name="invoice_no"
-                  label="Fatura No"
-                  rules={[{ required: true, message: 'Lütfen fatura numarası girin' }]}
+                  name="currency"
+                  label="Para Birimi"
+                  rules={[{ required: true, message: 'Lütfen para birimi seçin' }]}
                 >
-                  <Input />
+                  <Select onChange={currencyChangeHandler}>
+                    <Option value="TRY">TRY</Option>
+                    <Option value="USD">USD</Option>
+                    <Option value="EUR">EUR</Option>
+                  </Select>
                 </Form.Item>
+                {fxRates && form.getFieldValue('currency') !== 'TRY' && (
+                  <div style={{ marginTop: -15, marginBottom: 16 }}>
+                    <small style={{ color: '#888' }}>
+                      Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
+                    </small>
+                  </div>
+                )}
               </Col>
             </Row>
 
@@ -309,47 +350,6 @@ const InvoiceForm = () => {
                 </div>
               </Col>
               <Col span={8}>
-                <Form.Item
-                  name="vat_rate"
-                  label="KDV Oranı (%)"
-                  rules={[{ required: true, message: 'Lütfen KDV oranı girin' }]}
-                >
-                  <Select onChange={calculateTotal}>
-                    <Option value={0}>0%</Option>
-                    <Option value={5}>5%</Option>
-                    <Option value={10}>10%</Option>
-                    <Option value={16}>16%</Option>
-                    <Option value={20}>20%</Option>
-                  </Select>
-                </Form.Item>
-                <div style={{ marginTop: -15, marginBottom: 16 }}>
-                  <small style={{ color: '#888' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
-                </div>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name="currency"
-                  label="Para Birimi"
-                  rules={[{ required: true, message: 'Lütfen para birimi seçin' }]}
-                >
-                  <Select onChange={currencyChangeHandler}>
-                    <Option value="TRY">TRY</Option>
-                    <Option value="USD">USD</Option>
-                    <Option value="EUR">EUR</Option>
-                  </Select>
-                </Form.Item>
-                {fxRates && form.getFieldValue('currency') !== 'TRY' && (
-                  <div style={{ marginTop: -15, marginBottom: 16 }}>
-                    <small style={{ color: '#888' }}>
-                      Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
-                    </small>
-                  </div>
-                )}
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={8}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Form.Item
                     name="total"
@@ -373,8 +373,6 @@ const InvoiceForm = () => {
                 <div style={{ marginTop: -15 }}>
                   <small style={{ color: '#888' }}>TL Karşılığı: {tryValues.total.toFixed(2)} TL</small>
                 </div>
-              </Col>
-              <Col span={8}>
               </Col>
               <Col span={8} style={{ textAlign: 'right', marginTop: 30 }}>
                 <Form.Item>
