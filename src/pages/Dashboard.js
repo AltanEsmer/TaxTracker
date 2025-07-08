@@ -90,7 +90,8 @@ const Dashboard = () => {
       const validatedData = {
         vatByMonth: data.vatByMonth || [],
         currencyDistribution: data.currencyDistribution || [],
-        monthlyTotals: data.monthlyTotals || []
+        monthlyTotals: data.monthlyTotals || [],
+        rawInvoices: data.rawInvoices || [] // Added rawInvoices for new calculation logic
       };
       
       console.log('Validated dashboard data:', validatedData);
@@ -112,7 +113,7 @@ const Dashboard = () => {
   };
 
   // Prepare chart data
-  const prepareVatByMonthChart = () => {
+  const prepareVatByMonthChart = (type) => {
     if (!dashboardData || !dashboardData.vatByMonth || dashboardData.vatByMonth.length === 0) {
       return {
         labels: [],
@@ -120,11 +121,11 @@ const Dashboard = () => {
       };
     }
     let data = dashboardData.vatByMonth;
-    if (activeType !== 'Tümü') {
-      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
     }
     
-    console.log('VAT chart data for type:', activeType, 'records:', data.length);
+    console.log('VAT chart data for type:', type, 'records:', data.length);
     
     // If no data after filtering, return empty chart
     if (data.length === 0) {
@@ -193,7 +194,7 @@ const Dashboard = () => {
     };
   };
 
-  const prepareCurrencyDistributionChart = () => {
+  const prepareCurrencyDistributionChart = (type) => {
     if (!dashboardData || !dashboardData.currencyDistribution || dashboardData.currencyDistribution.length === 0) {
       return {
         labels: [],
@@ -201,8 +202,8 @@ const Dashboard = () => {
       };
     }
     let data = dashboardData.currencyDistribution;
-    if (activeType !== 'Tümü') {
-      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
     }
     
     // If no data after filtering, return empty chart
@@ -258,7 +259,7 @@ const Dashboard = () => {
     };
   };
 
-  const prepareMonthlyTotalsChart = () => {
+  const prepareMonthlyTotalsChart = (type) => {
     if (!dashboardData || !dashboardData.monthlyTotals || dashboardData.monthlyTotals.length === 0) {
       return {
         labels: [],
@@ -266,8 +267,8 @@ const Dashboard = () => {
       };
     }
     let data = dashboardData.monthlyTotals;
-    if (activeType !== 'Tümü') {
-      data = data.filter(item => (item.invoice_type || 'Alış') === activeType);
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
     }
     
     // If no data after filtering, return empty chart
@@ -326,45 +327,221 @@ const Dashboard = () => {
   };
 
   // Calculate summary statistics
+  // These functions now match the Faturalar page logic: they sum over the filtered data for the selected date range and type.
   const calculateTotalVat = (type = null) => {
-    if (!dashboardData || !dashboardData.vatByMonth) return '0.00';
-    let filteredData = dashboardData.vatByMonth;
+    if (!dashboardData || !dashboardData.rawInvoices) return '0.00';
+    let filteredData = dashboardData.rawInvoices;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
+    // Log for verification
+    console.log('Dashboard KDV calculation, type:', type, 'records:', filteredData.length);
     const total = filteredData.reduce((sum, item) => {
-      const vatAmount = Number(item.vat_amount) || 0;
+      const vatAmount = Number(item.try_equivalent?.vat_amount || item.vat_amount) || 0;
       return sum + vatAmount;
     }, 0);
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
   const calculateTotalInvoices = (type = null) => {
-    if (!dashboardData || !dashboardData.currencyDistribution) return 0;
-    
-    let filteredData = dashboardData.currencyDistribution;
+    if (!dashboardData || !dashboardData.rawInvoices) return 0;
+    let filteredData = dashboardData.rawInvoices;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    
+    // Log for verification
+    console.log('Dashboard Fatura Sayısı calculation, type:', type, 'records:', filteredData.length);
     return filteredData.reduce((sum, item) => {
-      const count = Number(item.count) || 0;
+      const count = Number(item.try_equivalent?.count || item.count) || 0;
       return sum + count;
     }, 0);
   };
 
   const calculateTotalAmount = (type = null) => {
-    if (!dashboardData || !dashboardData.monthlyTotals) return '0.00';
-    let filteredData = dashboardData.monthlyTotals;
+    if (!dashboardData || !dashboardData.rawInvoices) return '0.00';
+    let filteredData = dashboardData.rawInvoices;
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
+    // Log for verification
+    console.log('Dashboard Toplam Tutar calculation, type:', type, 'records:', filteredData.length);
     const total = filteredData.reduce((sum, item) => {
-      const amount = Number(item.total_amount) || 0;
+      const amount = Number(item.try_equivalent?.total || item.total) || 0;
       return sum + amount;
     }, 0);
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
+
+  // Helper to render summary and charts for a given type
+  function renderSummaryAndCharts(type) {
+    return (
+      <>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Card className="dashboard-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}
+                value={calculateTotalsForDashboard(type).vatAmount}
+                suffix="TL"
+                precision={2}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card className="dashboard-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}
+                value={calculateTotalsForDashboard(type).count}
+                prefix={<FileOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={8}>
+            <Card className="dashboard-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}
+                value={calculateTotalsForDashboard(type).total}
+                prefix={<DollarOutlined />}
+                suffix="TL"
+                precision={2}
+              />
+            </Card>
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={24}>
+            <Card title="Aylık KDV" className="chart-container">
+              <div style={{ height: '400px' }}>
+                <Bar data={prepareVatByMonthChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value) {
+                          return value.toLocaleString('tr-TR') + ' TL';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        boxWidth: 12,
+                        padding: 15
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={12}>
+            <Card title="Para Birimi Dağılımı" className="chart-container">
+              <div style={{ height: '350px' }}>
+                <Pie data={prepareCurrencyDistributionChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'right',
+                      labels: {
+                        padding: 20
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.label}: ${context.raw} adet`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card title="Aylık Toplam" className="chart-container">
+              <div style={{ height: '350px' }}>
+                <Line data={prepareMonthlyTotalsChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value) {
+                          return value.toLocaleString('tr-TR') + ' TL';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </>
+    );
+  }
+
+  // Calculation logic matching Faturalar page
+  function calculateTotalsForDashboard(type) {
+    if (!dashboardData || !dashboardData.rawInvoices) return { subtotal: 0, vatAmount: 0, total: 0, count: 0 };
+    let filtered = dashboardData.rawInvoices;
+    if (type && type !== 'Tümü') {
+      filtered = filtered.filter(inv => (inv.invoice_type || 'Alış') === type);
+    }
+    let subtotalSum = 0, vatAmountSum = 0, totalSum = 0, count = 0;
+    filtered.forEach(inv => {
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        subtotalSum += Number(inv.try_equivalent.subtotal) || 0;
+        vatAmountSum += Number(inv.try_equivalent.vat_amount) || 0;
+        totalSum += Number(inv.try_equivalent.total) || 0;
+      } else {
+        const subtotal = Number(inv.subtotal) || 0;
+        const vatRate = Number(inv.vat_rate) || 0;
+        const vatAmount = subtotal * (vatRate / 100);
+        let conversionRate = 1;
+        if (inv.currency === 'USD') conversionRate = 30;
+        else if (inv.currency === 'EUR') conversionRate = 32;
+        subtotalSum += subtotal * conversionRate;
+        vatAmountSum += vatAmount * conversionRate;
+        totalSum += Number(inv.total || 0) * conversionRate;
+      }
+      count++;
+    });
+    return {
+      subtotal: subtotalSum,
+      vatAmount: vatAmountSum,
+      total: totalSum,
+      count
+    };
+  }
 
   if (loading) {
     return <Spin size="large" tip="Yükleniyor..." />;
@@ -395,220 +572,21 @@ const Dashboard = () => {
         activeKey={activeType === 'Tümü' ? 'all' : activeType === 'Alış' ? 'buying' : 'selling'}
         onChange={key => {
           console.log('Tab changed to:', key);
-          if (key === 'all') {
-            setActiveType('Tümü');
-          } else if (key === 'buying') {
-            setActiveType('Alış');
-          } else if (key === 'selling') {
-            setActiveType('Satış');
-          }
+          if (key === 'all') setActiveType('Tümü');
+          else if (key === 'buying') setActiveType('Alış');
+          else if (key === 'selling') setActiveType('Satış');
         }}
       >
         <TabPane tab="Tümü" key="all">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Toplam KDV"
-                  value={calculateTotalVat()}
-                  prefix={<PercentageOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Fatura Sayısı"
-                  value={calculateTotalInvoices()}
-                  prefix={<FileOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Toplam Tutar"
-                  value={calculateTotalAmount()}
-                  prefix={<DollarOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-          </Row>
-
-          <Row gutter={16} style={{ marginTop: 16 }}>
-            <Col span={24}>
-              <Card title="Aylık KDV" className="chart-container">
-                <div style={{ height: '400px' }}>
-                  <Bar data={prepareVatByMonthChart()} options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: function(value) {
-                            return value.toLocaleString('tr-TR') + ' TL';
-                          }
-                        }
-                      }
-                    },
-                    plugins: {
-                      legend: {
-                        position: 'top',
-                        labels: {
-                          boxWidth: 12,
-                          padding: 15
-                        }
-                      },
-                      tooltip: {
-                        callbacks: {
-                          label: function(context) {
-                            return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
-                          }
-                        }
-                      }
-                    }
-                  }} />
-                </div>
-              </Card>
-            </Col>
-          </Row>
-
-          <Row gutter={16} style={{ marginTop: 16 }}>
-            <Col span={12}>
-              <Card title="Para Birimi Dağılımı" className="chart-container">
-                <div style={{ height: '350px' }}>
-                  <Pie data={prepareCurrencyDistributionChart()} options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: 'right',
-                        labels: {
-                          padding: 20
-                        }
-                      },
-                      tooltip: {
-                        callbacks: {
-                          label: function(context) {
-                            return `${context.label}: ${context.raw} adet`;
-                          }
-                        }
-                      }
-                    }
-                  }} />
-                </div>
-              </Card>
-            </Col>
-            <Col span={12}>
-              <Card title="Aylık Toplam" className="chart-container">
-                <div style={{ height: '350px' }}>
-                  <Line data={prepareMonthlyTotalsChart()} options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: function(value) {
-                            return value.toLocaleString('tr-TR') + ' TL';
-                          }
-                        }
-                      }
-                    },
-                    plugins: {
-                      legend: {
-                        position: 'top',
-                      },
-                      tooltip: {
-                        callbacks: {
-                          label: function(context) {
-                            return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
-                          }
-                        }
-                      }
-                    }
-                  }} />
-                </div>
-              </Card>
-            </Col>
-          </Row>
+          {renderSummaryAndCharts('Tümü')}
         </TabPane>
         
         <TabPane tab="Alış" key="buying">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Alış KDV"
-                  value={calculateTotalVat('Alış')}
-                  prefix={<PercentageOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Alış Fatura Sayısı"
-                  value={calculateTotalInvoices('Alış')}
-                  prefix={<FileOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Alış Toplam Tutar"
-                  value={calculateTotalAmount('Alış')}
-                  prefix={<DollarOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-          </Row>
+          {renderSummaryAndCharts('Alış')}
         </TabPane>
         
         <TabPane tab="Satış" key="selling">
-          <Row gutter={16}>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Satış KDV"
-                  value={calculateTotalVat('Satış')}
-                  prefix={<PercentageOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Satış Fatura Sayısı"
-                  value={calculateTotalInvoices('Satış')}
-                  prefix={<FileOutlined />}
-                />
-              </Card>
-            </Col>
-            <Col span={8}>
-              <Card className="dashboard-card">
-                <Statistic
-                  title="Satış Toplam Tutar"
-                  value={calculateTotalAmount('Satış')}
-                  prefix={<DollarOutlined />}
-                  suffix="TL"
-                  precision={2}
-                />
-              </Card>
-            </Col>
-          </Row>
+          {renderSummaryAndCharts('Satış')}
         </TabPane>
       </Tabs>
     </div>

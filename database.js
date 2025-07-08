@@ -441,7 +441,8 @@ class DatabaseManager {
       return {
         vatByMonth,
         currencyDistribution,
-        monthlyTotals
+        monthlyTotals,
+        rawInvoices: filteredInvoices // Add this line for dashboard raw data
       };
     } catch (error) {
       console.error('Error getting dashboard data:', error);
