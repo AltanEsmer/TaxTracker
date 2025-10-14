@@ -329,6 +329,37 @@ class DatabaseManager {
     }
   }
 
+  deleteFxRate(id) {
+    try {
+      const index = this.fxRates.findIndex(rate => rate.id === Number(id));
+      
+      if (index !== -1) {
+        const deletedRate = this.fxRates[index];
+        
+        // Check if any invoices exist for this month/year
+        const invoicesForMonth = this.invoices.filter(invoice => {
+          const invoiceDate = new Date(invoice.date);
+          return invoiceDate.getFullYear() === deletedRate.year && 
+                 (invoiceDate.getMonth() + 1) === deletedRate.month;
+        });
+        
+        this.fxRates.splice(index, 1);
+        this.saveFxRates();
+        
+        return { 
+          id: Number(id), 
+          hasInvoices: invoicesForMonth.length > 0,
+          invoiceCount: invoicesForMonth.length
+        };
+      } else {
+        throw new Error(`FX rate with ID ${id} not found`);
+      }
+    } catch (error) {
+      console.error('Error deleting FX rate:', error);
+      throw error;
+    }
+  }
+
   // Dashboard data
   getDashboardData(filters = {}) {
     try {

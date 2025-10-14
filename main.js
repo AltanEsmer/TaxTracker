@@ -272,6 +272,15 @@ ipcMain.handle('update-fx-rate', async (event, id, fxRate) => {
   }
 });
 
+ipcMain.handle('delete-fx-rate', async (event, id) => {
+  try {
+    return db.deleteFxRate(id);
+  } catch (error) {
+    console.error('Error in delete-fx-rate:', error);
+    throw error;
+  }
+});
+
 ipcMain.handle('get-dashboard-data', async (event, filters) => {
   try {
     return db.getDashboardData(filters);

@@ -118,29 +118,21 @@ const InvoiceList = () => {
           
           console.log(`Invoice ${index + 1}: Using TRY equivalent for invoice:`, invoice.invoice_no, 
                       'TRY Total:', invoice.try_equivalent.total);
-        } else {
-          // Fallback to calculating based on currency conversion
+        } else if (invoice.currency === 'TRY') {
+          // For TRY invoices without try_equivalent, use direct values
           const subtotal = Number(invoice.subtotal) || 0;
           const vatRate = Number(invoice.vat_rate) || 0;
           const vatAmount = subtotal * (vatRate / 100);
           
-          // Apply conversion if needed
-          let conversionRate = 1; // Default for TRY
-          if (invoice.currency === 'USD') {
-            // Use a fallback rate if not available
-            conversionRate = 30; // Fallback rate
-          } else if (invoice.currency === 'EUR') {
-            // Use a fallback rate if not available
-            conversionRate = 32; // Fallback rate
-          }
+          subtotalSum += subtotal;
+          vatAmountSum += vatAmount;
+          totalSum += Number(invoice.total || 0);
           
-          subtotalSum += subtotal * conversionRate;
-          vatAmountSum += vatAmount * conversionRate;
-          totalSum += Number(invoice.total || 0) * conversionRate;
-          
-          console.log(`Invoice ${index + 1}: Using fallback conversion for invoice:`, invoice.invoice_no, 
-                      'Currency:', invoice.currency, 'Rate:', conversionRate, 
-                      'Original Total:', invoice.total, 'TRY Total:', Number(invoice.total || 0) * conversionRate);
+          console.log(`Invoice ${index + 1}: Using direct TRY values for invoice:`, invoice.invoice_no);
+        } else {
+          // For foreign currency invoices without try_equivalent, log warning
+          console.warn(`Invoice ${index + 1}: Missing TRY equivalent for foreign currency invoice:`, invoice.invoice_no, 
+                       'Currency:', invoice.currency, '- Please add FX rate for this month and re-save the invoice.');
         }
       } catch (error) {
         console.error(`Error calculating totals for invoice ${index + 1}:`, error);
@@ -234,14 +226,14 @@ const InvoiceList = () => {
           trySubtotal = invoice.try_equivalent.subtotal || 0;
           tryVatAmount = invoice.try_equivalent.vat_amount || 0;
           tryTotal = invoice.try_equivalent.total || 0;
-        } else {
-          let conversionRate = 1;
-          if (invoice.currency === 'USD') conversionRate = 30;
-          else if (invoice.currency === 'EUR') conversionRate = 32;
-          trySubtotal = invoice.subtotal * conversionRate;
-          tryVatAmount = vatAmount * conversionRate;
-          tryTotal = invoice.total * conversionRate;
+        } else if (invoice.currency === 'TRY') {
+          trySubtotal = invoice.subtotal;
+          tryVatAmount = vatAmount;
+          tryTotal = invoice.total;
         }
+        
+        // Only export TRY values if they exist
+        const hasTryEquivalent = invoice.try_equivalent && invoice.try_equivalent.total;
         
         const row = {
           'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
@@ -253,9 +245,9 @@ const InvoiceList = () => {
           'KDV Oranı': invoice.vat_rate,
           'KDV Tutar': vatAmount,
           'Genel Top': invoice.total,
-          'Ara Toplam (TL)': trySubtotal,
-          'KDV Tutar (TL)': tryVatAmount,
-          'Genel Toplam (TL)': tryTotal
+          'Ara Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? trySubtotal : 'KUR EKSIK',
+          'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? tryVatAmount : 'KUR EKSIK',
+          'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? tryTotal : 'KUR EKSIK'
         };
         
         console.log(`Row ${index + 1}:`, row);

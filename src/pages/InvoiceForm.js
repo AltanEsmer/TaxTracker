@@ -50,24 +50,31 @@ const InvoiceForm = () => {
     if (id) {
       setIsEditing(true);
       fetchInvoice(id);
+    } else {
+      // Fetch current month's FX rates for new invoices
+      fetchFxRatesForDate(dayjs());
     }
-    
-    // Fetch current month's FX rates
-    fetchCurrentFxRates();
   }, [id]);
 
-  const fetchCurrentFxRates = async () => {
+  const fetchFxRatesForDate = async (date) => {
     try {
-      const currentDate = new Date();
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth() + 1;
+      const selectedDate = date ? date.toDate() : new Date();
+      const year = selectedDate.getFullYear();
+      const month = selectedDate.getMonth() + 1;
       
       const rates = await window.api.getFxRates(year, month);
       
       if (rates && rates.length > 0) {
         setFxRates(rates[0]);
+        // Recalculate TRY values with the new rate
+        const subtotal = form.getFieldValue('subtotal') || 0;
+        const vatRate = form.getFieldValue('vat_rate') || 0;
+        const total = form.getFieldValue('total') || 0;
+        const currency = form.getFieldValue('currency');
+        updateTryValues(subtotal, vatRate, total, currency);
       } else {
-        message.warning('Bu ay için kur bilgisi bulunamadı. Lütfen Kur Yönetimi sayfasından ekleyin.');
+        setFxRates(null);
+        message.warning(`${year} yılı ${month}. ay için kur bilgisi bulunamadı. Lütfen Kur Yönetimi sayfasından ekleyin.`);
       }
     } catch (error) {
       console.error('Error fetching FX rates:', error);
@@ -83,10 +90,13 @@ const InvoiceForm = () => {
       
       if (invoice) {
         setCurrentInvoice(invoice);
+        const invoiceDate = dayjs(invoice.date);
         form.setFieldsValue({
           ...invoice,
-          date: dayjs(invoice.date)
+          date: invoiceDate
         });
+        // Fetch FX rates for the invoice date
+        await fetchFxRatesForDate(invoiceDate);
         updateTryValues(invoice.subtotal, invoice.vat_rate, invoice.total, invoice.currency);
       } else {
         message.error('Fatura bulunamadı.');
@@ -268,7 +278,12 @@ const InvoiceForm = () => {
                 >
                   <DatePicker 
                     style={{ width: '100%' }} 
-                    format="DD/MM/YYYY" 
+                    format="DD/MM/YYYY"
+                    onChange={(date) => {
+                      if (date) {
+                        fetchFxRatesForDate(date);
+                      }
+                    }}
                   />
                 </Form.Item>
               </Col>

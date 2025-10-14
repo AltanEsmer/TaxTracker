@@ -9,12 +9,17 @@ import {
   Spin, 
   Alert,
   Select,
-  Tabs
+  Tabs,
+  Tag
 } from 'antd';
 import { 
   DollarOutlined, 
   FileOutlined, 
-  PercentageOutlined 
+  PercentageOutlined,
+  RiseOutlined,
+  FallOutlined,
+  SwapOutlined,
+  TrophyOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Bar, Pie, Line } from 'react-chartjs-2';
@@ -372,42 +377,199 @@ const Dashboard = () => {
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
   };
 
+  // Calculate profit/loss (Sales - Purchases)
+  const calculateProfitLoss = () => {
+    if (!dashboardData || !dashboardData.rawInvoices) return 0;
+    
+    const salesTotal = dashboardData.rawInvoices
+      .filter(inv => inv.invoice_type === 'Satış')
+      .reduce((sum, inv) => {
+        if (inv.try_equivalent && inv.try_equivalent.total) {
+          return sum + Number(inv.try_equivalent.total);
+        } else if (inv.currency === 'TRY') {
+          return sum + Number(inv.total || 0);
+        }
+        return sum;
+      }, 0);
+    
+    const purchasesTotal = dashboardData.rawInvoices
+      .filter(inv => inv.invoice_type === 'Alış')
+      .reduce((sum, inv) => {
+        if (inv.try_equivalent && inv.try_equivalent.total) {
+          return sum + Number(inv.try_equivalent.total);
+        } else if (inv.currency === 'TRY') {
+          return sum + Number(inv.total || 0);
+        }
+        return sum;
+      }, 0);
+    
+    return salesTotal - purchasesTotal;
+  };
+
+  // Get top companies by total amount
+  const getTopCompanies = (limit = 5) => {
+    if (!dashboardData || !dashboardData.rawInvoices) return [];
+    
+    const companyTotals = {};
+    
+    dashboardData.rawInvoices.forEach(inv => {
+      if (!companyTotals[inv.company]) {
+        companyTotals[inv.company] = 0;
+      }
+      
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        companyTotals[inv.company] += Number(inv.try_equivalent.total);
+      } else if (inv.currency === 'TRY') {
+        companyTotals[inv.company] += Number(inv.total || 0);
+      }
+    });
+    
+    return Object.entries(companyTotals)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, limit);
+  };
+
+  // Get currency breakdown
+  const getCurrencyBreakdown = () => {
+    if (!dashboardData || !dashboardData.rawInvoices) return [];
+    
+    const currencyStats = {};
+    
+    dashboardData.rawInvoices.forEach(inv => {
+      if (!currencyStats[inv.currency]) {
+        currencyStats[inv.currency] = { count: 0, total: 0 };
+      }
+      
+      currencyStats[inv.currency].count += 1;
+      
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        currencyStats[inv.currency].total += Number(inv.try_equivalent.total);
+      } else if (inv.currency === 'TRY') {
+        currencyStats[inv.currency].total += Number(inv.total || 0);
+      }
+    });
+    
+    return Object.entries(currencyStats)
+      .map(([currency, stats]) => ({ currency, ...stats }))
+      .sort((a, b) => b.total - a.total);
+  };
+
   // Helper to render summary and charts for a given type
   function renderSummaryAndCharts(type) {
+    const totals = calculateTotalsForDashboard(type);
+    const profitLoss = calculateProfitLoss();
+    const topCompanies = getTopCompanies(5);
+    const currencyBreakdown = getCurrencyBreakdown();
+    
     return (
       <>
         <Row gutter={16}>
-          <Col span={8}>
-            <Card className="dashboard-card">
+          <Col span={6}>
+            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
               <Statistic
-                title={type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}
-                value={calculateTotalsForDashboard(type).vatAmount}
+                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}</span>}
+                value={totals.vatAmount}
                 suffix="TL"
                 precision={2}
+                valueStyle={{ color: 'white' }}
+                prefix={<PercentageOutlined />}
               />
             </Card>
           </Col>
-          <Col span={8}>
-            <Card className="dashboard-card">
+          <Col span={6}>
+            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
               <Statistic
-                title={type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}
-                value={calculateTotalsForDashboard(type).count}
+                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}</span>}
+                value={totals.count}
                 prefix={<FileOutlined />}
+                valueStyle={{ color: 'white' }}
               />
             </Card>
           </Col>
-          <Col span={8}>
-            <Card className="dashboard-card">
+          <Col span={6}>
+            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
               <Statistic
-                title={type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}
-                value={calculateTotalsForDashboard(type).total}
+                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}</span>}
+                value={totals.total}
                 prefix={<DollarOutlined />}
                 suffix="TL"
                 precision={2}
+                valueStyle={{ color: 'white' }}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="dashboard-card" style={{ 
+              background: profitLoss >= 0 ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' : 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 
+              color: 'white' 
+            }}>
+              <Statistic
+                title={<span style={{ color: 'white' }}>Kar/Zarar (Satış - Alış)</span>}
+                value={Math.abs(profitLoss)}
+                prefix={profitLoss >= 0 ? <RiseOutlined /> : <FallOutlined />}
+                suffix="TL"
+                precision={2}
+                valueStyle={{ color: 'white' }}
               />
             </Card>
           </Col>
         </Row>
+        
+        {type === 'Tümü' && (
+          <>
+            <Row gutter={16} style={{ marginTop: 16 }}>
+              <Col span={12}>
+                <Card title={<><TrophyOutlined /> En Yüksek 5 Şirket (Tutara Göre)</>}>
+                  {topCompanies.length > 0 ? (
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {topCompanies.map((company, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          padding: '8px 0', 
+                          borderBottom: index < topCompanies.length - 1 ? '1px solid #f0f0f0' : 'none' 
+                        }}>
+                          <span><strong>{index + 1}.</strong> {company.name}</span>
+                          <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{company.total.toFixed(2)} TL</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Veri yok</div>
+                  )}
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card title={<><SwapOutlined /> Para Birimi Dağılımı (Fatura Sayısı)</>}>
+                  {currencyBreakdown.length > 0 ? (
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {currencyBreakdown.map((item, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          padding: '8px 0', 
+                          borderBottom: index < currencyBreakdown.length - 1 ? '1px solid #f0f0f0' : 'none' 
+                        }}>
+                          <span><strong>{item.currency}</strong></span>
+                          <div>
+                            <Tag color={item.currency === 'TRY' ? 'blue' : item.currency === 'USD' ? 'green' : 'orange'}>
+                              {item.count} adet
+                            </Tag>
+                            <span style={{ marginLeft: '8px', color: '#666' }}>{item.total.toFixed(2)} TL</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Veri yok</div>
+                  )}
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+        
         <Row gutter={16} style={{ marginTop: 16 }}>
           <Col span={24}>
             <Card title="Aylık KDV" className="chart-container">
@@ -522,16 +684,13 @@ const Dashboard = () => {
         subtotalSum += Number(inv.try_equivalent.subtotal) || 0;
         vatAmountSum += Number(inv.try_equivalent.vat_amount) || 0;
         totalSum += Number(inv.try_equivalent.total) || 0;
-      } else {
+      } else if (inv.currency === 'TRY') {
         const subtotal = Number(inv.subtotal) || 0;
         const vatRate = Number(inv.vat_rate) || 0;
         const vatAmount = subtotal * (vatRate / 100);
-        let conversionRate = 1;
-        if (inv.currency === 'USD') conversionRate = 30;
-        else if (inv.currency === 'EUR') conversionRate = 32;
-        subtotalSum += subtotal * conversionRate;
-        vatAmountSum += vatAmount * conversionRate;
-        totalSum += Number(inv.total || 0) * conversionRate;
+        subtotalSum += subtotal;
+        vatAmountSum += vatAmount;
+        totalSum += Number(inv.total || 0);
       }
       count++;
     });

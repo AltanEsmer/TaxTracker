@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld(
     getFxRates: (year, month) => ipcRenderer.invoke('get-fx-rates', year, month),
     addFxRate: (fxRate) => ipcRenderer.invoke('add-fx-rate', fxRate),
     updateFxRate: (id, fxRate) => ipcRenderer.invoke('update-fx-rate', id, fxRate),
+    deleteFxRate: (id) => ipcRenderer.invoke('delete-fx-rate', id),
     
     // Dashboard data
     getDashboardData: (filters) => ipcRenderer.invoke('get-dashboard-data', filters)
