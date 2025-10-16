@@ -28,6 +28,8 @@
     "concurrently": "^7.6.0",
     "cross-env": "^7.0.3",
     "electron": "^22.3.27",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.1",
     "wait-on": "^7.0.1"
   },
   "dependencies": {

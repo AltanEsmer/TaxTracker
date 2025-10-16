@@ -10,7 +10,8 @@ import {
   Alert,
   Select,
   Tabs,
-  Tag
+  Tag,
+  Button
 } from 'antd';
 import { 
   DollarOutlined, 
@@ -19,7 +20,8 @@ import {
   RiseOutlined,
   FallOutlined,
   SwapOutlined,
-  TrophyOutlined
+  TrophyOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { Bar, Pie, Line } from 'react-chartjs-2';
@@ -58,11 +60,60 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
-  const [dateRange, setDateRange] = useState([
-    dayjs().startOf('month'),
-    dayjs().endOf('month')
-  ]);
-  const [activeType, setActiveType] = useState('Tümü'); // 'Tümü', 'Alış', 'Satış'
+  
+  // Helper functions for localStorage
+  const saveFiltersToStorage = (dateRange, activeType) => {
+    try {
+      localStorage.setItem('dashboardFilters', JSON.stringify({
+        dateRange: {
+          start: dateRange[0].format('YYYY-MM-DD'),
+          end: dateRange[1].format('YYYY-MM-DD')
+        },
+        activeType
+      }));
+    } catch (error) {
+      console.warn('Failed to save filters to localStorage:', error);
+    }
+  };
+
+  const loadFiltersFromStorage = () => {
+    try {
+      const saved = localStorage.getItem('dashboardFilters');
+      if (saved) {
+        const filters = JSON.parse(saved);
+        return {
+          dateRange: [
+            dayjs(filters.dateRange.start),
+            dayjs(filters.dateRange.end)
+          ],
+          activeType: filters.activeType || 'Tümü'
+        };
+      }
+    } catch (error) {
+      console.warn('Failed to load filters from localStorage:', error);
+    }
+    return null;
+  };
+
+  const resetFiltersToCurrentMonth = () => {
+    const currentMonthRange = [
+      dayjs().startOf('month'),
+      dayjs().endOf('month')
+    ];
+    setDateRange(currentMonthRange);
+    setActiveType('Tümü');
+    localStorage.removeItem('dashboardFilters');
+  };
+
+  // Initialize state with localStorage values if available
+  const savedFilters = loadFiltersFromStorage();
+  const [dateRange, setDateRange] = useState(
+    savedFilters ? savedFilters.dateRange : [
+      dayjs().startOf('month'),
+      dayjs().endOf('month')
+    ]
+  );
+  const [activeType, setActiveType] = useState(savedFilters ? savedFilters.activeType : 'Tümü');
 
   useEffect(() => {
     if (!window.api) {
@@ -114,6 +165,7 @@ const Dashboard = () => {
   const handleDateRangeChange = (dates) => {
     if (dates && dates.length === 2) {
       setDateRange(dates);
+      saveFiltersToStorage(dates, activeType);
     }
   };
 
@@ -713,15 +765,28 @@ const Dashboard = () => {
   return (
     <div>
       <Row gutter={[16, 16]} align="middle" className="page-header">
-        <Col span={18}>
+        <Col span={16}>
           <TitleText level={2}>Dashboard</TitleText>
         </Col>
-        <Col span={6} style={{ textAlign: 'right' }}>
+        <Col span={8} style={{ textAlign: 'right' }}>
           <RangePicker
             value={dateRange}
             onChange={handleDateRangeChange}
             format="DD/MM/YYYY"
             className="date-range-picker"
+            style={{ marginRight: 8 }}
+          />
+          <Button 
+            type="default" 
+            icon={<ReloadOutlined />} 
+            size="small"
+            onClick={resetFiltersToCurrentMonth}
+            title="Filtreleri bu aya sıfırla"
+            style={{ 
+              borderRadius: '6px',
+              backgroundColor: '#f0f0f0',
+              borderColor: '#d9d9d9'
+            }}
           />
         </Col>
       </Row>
@@ -731,9 +796,13 @@ const Dashboard = () => {
         activeKey={activeType === 'Tümü' ? 'all' : activeType === 'Alış' ? 'buying' : 'selling'}
         onChange={key => {
           console.log('Tab changed to:', key);
-          if (key === 'all') setActiveType('Tümü');
-          else if (key === 'buying') setActiveType('Alış');
-          else if (key === 'selling') setActiveType('Satış');
+          let newActiveType = 'Tümü';
+          if (key === 'all') newActiveType = 'Tümü';
+          else if (key === 'buying') newActiveType = 'Alış';
+          else if (key === 'selling') newActiveType = 'Satış';
+          
+          setActiveType(newActiveType);
+          saveFiltersToStorage(dateRange, newActiveType);
         }}
       >
         <TabPane tab="Tümü" key="all">

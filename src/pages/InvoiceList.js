@@ -241,13 +241,13 @@ const InvoiceList = () => {
           'Şirket': invoice.company,
           'Fatura No': invoice.invoice_no,
           'Para Birim': invoice.currency,
-          'Ara Toplam': invoice.subtotal,
-          'KDV Oranı': invoice.vat_rate,
-          'KDV Tutar': vatAmount,
-          'Genel Top': invoice.total,
-          'Ara Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? trySubtotal : 'KUR EKSIK',
-          'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? tryVatAmount : 'KUR EKSIK',
-          'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? tryTotal : 'KUR EKSIK'
+          'Ara Toplam': typeof invoice.subtotal === 'number' ? invoice.subtotal.toFixed(2) : invoice.subtotal,
+          'KDV Oranı': typeof invoice.vat_rate === 'number' ? invoice.vat_rate.toFixed(2) : invoice.vat_rate,
+          'KDV Tutar': typeof vatAmount === 'number' ? vatAmount.toFixed(2) : vatAmount,
+          'Genel Top': typeof invoice.total === 'number' ? invoice.total.toFixed(2) : invoice.total,
+          'Ara Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof trySubtotal === 'number' ? trySubtotal.toFixed(2) : trySubtotal) : 'KUR EKSIK',
+          'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryVatAmount === 'number' ? tryVatAmount.toFixed(2) : tryVatAmount) : 'KUR EKSIK',
+          'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryTotal === 'number' ? tryTotal.toFixed(2) : tryTotal) : 'KUR EKSIK'
         };
         
         console.log(`Row ${index + 1}:`, row);
@@ -267,9 +267,9 @@ const InvoiceList = () => {
         'KDV Oranı': '',
         'KDV Tutar': '',
         'Genel Top': '',
-        'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0),
-        'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0),
-        'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0)
+        'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0).toFixed(2),
+        'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0).toFixed(2),
+        'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0).toFixed(2)
       };
 
       console.log('Total row:', totalRow);

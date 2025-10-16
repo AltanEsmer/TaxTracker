@@ -79,7 +79,7 @@ async function buildFresh() {
 
     // 6. Build the installer with portable option
     console.log('Building the portable executable...');
-    if (!runCommand('electron-builder --config electron-builder.yml --win portable', 'Failed to build portable executable')) {
+    if (!runCommand('npx electron-builder --config electron-builder.yml --win portable', 'Failed to build portable executable')) {
       return false;
     }
 
