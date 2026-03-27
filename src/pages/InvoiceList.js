@@ -27,7 +27,6 @@ import {
 } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import * as XLSX from 'xlsx';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -63,10 +62,7 @@ const InvoiceList = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      console.log('Fetching invoices with filters:', filters);
       const data = await window.api.getInvoices(filters);
-      
-      console.log('Raw invoice data received:', data.length, 'records');
       
       if (!Array.isArray(data)) {
         throw new Error('Invalid data format received from API');
@@ -85,11 +81,9 @@ const InvoiceList = () => {
         return new Date(b.date) - new Date(a.date);
       });
       
-      console.log('Sorted invoice data:', sortedData.length, 'records');
       setInvoices(sortedData);
       calculateTotals(sortedData);
     } catch (error) {
-      console.error('Error fetching invoices:', error);
       message.error('Faturalar yüklenirken bir hata oluştu: ' + error.message);
       setInvoices([]);
       setTotals({ subtotal: 0, vatAmount: 0, total: 0 });
@@ -115,9 +109,6 @@ const InvoiceList = () => {
           subtotalSum += Number(invoice.try_equivalent.subtotal) || 0;
           vatAmountSum += Number(invoice.try_equivalent.vat_amount) || 0;
           totalSum += Number(invoice.try_equivalent.total) || 0;
-          
-          console.log(`Invoice ${index + 1}: Using TRY equivalent for invoice:`, invoice.invoice_no, 
-                      'TRY Total:', invoice.try_equivalent.total);
         } else if (invoice.currency === 'TRY') {
           // For TRY invoices without try_equivalent, use direct values
           const subtotal = Number(invoice.subtotal) || 0;
@@ -127,19 +118,13 @@ const InvoiceList = () => {
           subtotalSum += subtotal;
           vatAmountSum += vatAmount;
           totalSum += Number(invoice.total || 0);
-          
-          console.log(`Invoice ${index + 1}: Using direct TRY values for invoice:`, invoice.invoice_no);
         } else {
-          // For foreign currency invoices without try_equivalent, log warning
-          console.warn(`Invoice ${index + 1}: Missing TRY equivalent for foreign currency invoice:`, invoice.invoice_no, 
-                       'Currency:', invoice.currency, '- Please add FX rate for this month and re-save the invoice.');
+          // For foreign currency invoices without try_equivalent, skip
         }
       } catch (error) {
-        console.error(`Error calculating totals for invoice ${index + 1}:`, error);
+        // silently skip malformed invoice entries
       }
     });
-
-    console.log('Final totals calculated:', { subtotalSum, vatAmountSum, totalSum });
 
     setTotals({
       subtotal: subtotalSum,
@@ -154,7 +139,6 @@ const InvoiceList = () => {
       message.success('Fatura başarıyla silindi.');
       fetchInvoices();
     } catch (error) {
-      console.error('Error deleting invoice:', error);
       message.error('Fatura silinirken bir hata oluştu.');
     }
   };
@@ -208,20 +192,26 @@ const InvoiceList = () => {
     return '';
   };
 
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     if (invoices.length === 0) {
       message.warning('Aktarılacak fatura bulunamadı.');
       return;
     }
 
     try {
-      console.log('Exporting invoices:', invoices.length, 'records');
-      
-      // Prepare data for export (columns as in the image)
-      const exportData = invoices.map((invoice, index) => {
+      const fileName = `Faturalar_${dayjs().format('YYYY-MM-DD')}.xlsx`;
+
+      const filePath = await window.api.showSaveDialog({
+        defaultPath: fileName,
+        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+      });
+
+      if (!filePath) return; // User cancelled
+
+      const exportData = invoices.map((invoice) => {
         const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
         let trySubtotal = 0, tryVatAmount = 0, tryTotal = 0;
-        
+
         if (invoice.try_equivalent && invoice.try_equivalent.total) {
           trySubtotal = invoice.try_equivalent.subtotal || 0;
           tryVatAmount = invoice.try_equivalent.vat_amount || 0;
@@ -231,11 +221,10 @@ const InvoiceList = () => {
           tryVatAmount = vatAmount;
           tryTotal = invoice.total;
         }
-        
-        // Only export TRY values if they exist
+
         const hasTryEquivalent = invoice.try_equivalent && invoice.try_equivalent.total;
-        
-        const row = {
+
+        return {
           'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
           'Fatura Tip': invoice.invoice_type || 'Alış',
           'Şirket': invoice.company,
@@ -249,14 +238,8 @@ const InvoiceList = () => {
           'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryVatAmount === 'number' ? tryVatAmount.toFixed(2) : tryVatAmount) : 'KUR EKSIK',
           'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryTotal === 'number' ? tryTotal.toFixed(2) : tryTotal) : 'KUR EKSIK'
         };
-        
-        console.log(`Row ${index + 1}:`, row);
-        return row;
       });
 
-      console.log('Export data prepared:', exportData.length, 'rows');
-
-      // Calculate totals for TL columns
       const totalRow = {
         'Tarih': '',
         'Fatura Tip': '',
@@ -272,42 +255,21 @@ const InvoiceList = () => {
         'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0).toFixed(2)
       };
 
-      console.log('Total row:', totalRow);
-
-      // Create worksheet
-      const ws = XLSX.utils.json_to_sheet(exportData);
-      
-      // Add total row
-      XLSX.utils.sheet_add_json(ws, [totalRow], { skipHeader: true, origin: exportData.length + 1 });
-
-      // Set column widths for readability
-      ws['!cols'] = [
-        { wch: 12 }, // Tarih
-        { wch: 10 }, // Fatura Tip
-        { wch: 20 }, // Şirket
-        { wch: 15 }, // Fatura No
-        { wch: 10 }, // Para Birim
-        { wch: 12 }, // Ara Toplam
-        { wch: 10 }, // KDV Oranı
-        { wch: 12 }, // KDV Tutar
-        { wch: 12 }, // Genel Top
-        { wch: 16 }, // Ara Toplam (TL)
-        { wch: 16 }, // KDV Tutar (TL)
-        { wch: 16 }  // Genel Toplam (TL)
+      const colWidths = [
+        { wch: 12 }, { wch: 10 }, { wch: 20 }, { wch: 15 }, { wch: 10 },
+        { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 },
+        { wch: 16 }, { wch: 16 }, { wch: 16 }
       ];
 
-      // Create workbook
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Faturalar');
+      await window.api.exportToExcel({
+        rows: exportData,
+        totalRow,
+        colWidths,
+        sheetName: 'Faturalar'
+      }, filePath);
 
-      // Generate file name with date
-      const fileName = `Faturalar_${dayjs().format('YYYY-MM-DD')}.xlsx`;
-      XLSX.writeFile(wb, fileName);
-      
-      console.log('Excel file created successfully:', fileName);
-      message.success(`Faturalar başarıyla ${fileName} dosyasına aktarıldı. (${exportData.length} satır)`);
+      message.success(`Faturalar başarıyla aktarıldı. (${exportData.length} satır)`);
     } catch (error) {
-      console.error('Error exporting to Excel:', error);
       message.error('Excel dosyası oluşturulurken bir hata oluştu: ' + error.message);
     }
   };

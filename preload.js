@@ -17,6 +17,15 @@ contextBridge.exposeInMainWorld(
     deleteFxRate: (id) => ipcRenderer.invoke('delete-fx-rate', id),
     
     // Dashboard data
-    getDashboardData: (filters) => ipcRenderer.invoke('get-dashboard-data', filters)
+    getDashboardData: (filters) => ipcRenderer.invoke('get-dashboard-data', filters),
+
+    // Single invoice lookup
+    getInvoiceById: (id) => ipcRenderer.invoke('get-invoice-by-id', id),
+
+    // File dialogs
+    showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
+
+    // Excel export (main process)
+    exportToExcel: (data, filePath) => ipcRenderer.invoke('export-to-excel', data, filePath)
   }
-); 
+);

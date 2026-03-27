@@ -72,9 +72,19 @@ class DatabaseManager {
     }
   }
   
+  _atomicWrite(filePath, data) {
+    const json = JSON.stringify(data, null, 2);
+    const tmpPath = filePath + '.tmp';
+    if (fs.existsSync(filePath)) {
+      fs.copyFileSync(filePath, filePath + '.bak');
+    }
+    fs.writeFileSync(tmpPath, json, 'utf8');
+    fs.renameSync(tmpPath, filePath);
+  }
+
   saveInvoices() {
     try {
-      fs.writeFileSync(this.invoicesPath, JSON.stringify(this.invoices, null, 2), 'utf8');
+      this._atomicWrite(this.invoicesPath, this.invoices);
     } catch (error) {
       console.error('Error saving invoices:', error);
     }
@@ -82,7 +92,7 @@ class DatabaseManager {
   
   saveFxRates() {
     try {
-      fs.writeFileSync(this.fxRatesPath, JSON.stringify(this.fxRates, null, 2), 'utf8');
+      this._atomicWrite(this.fxRatesPath, this.fxRates);
     } catch (error) {
       console.error('Error saving FX rates:', error);
     }
@@ -151,6 +161,48 @@ class DatabaseManager {
     }
   }
 
+  _validateInvoice(invoice) {
+    if (!invoice.date || typeof invoice.date !== 'string' || invoice.date.trim() === '') {
+      throw new Error('Invoice date must be a non-empty string');
+    }
+    if (!invoice.company || typeof invoice.company !== 'string' || invoice.company.trim() === '') {
+      throw new Error('Invoice company must be a non-empty string');
+    }
+    if (!invoice.invoice_no || typeof invoice.invoice_no !== 'string' || invoice.invoice_no.trim() === '') {
+      throw new Error('Invoice invoice_no must be a non-empty string');
+    }
+    if (!['TRY', 'USD', 'EUR'].includes(invoice.currency)) {
+      throw new Error("Invoice currency must be one of 'TRY', 'USD', 'EUR'");
+    }
+    if (!isFinite(invoice.subtotal) || invoice.subtotal < 0) {
+      throw new Error('Invoice subtotal must be a finite number >= 0');
+    }
+    if (!isFinite(invoice.vat_rate) || invoice.vat_rate < 0) {
+      throw new Error('Invoice vat_rate must be a finite number >= 0');
+    }
+    if (!isFinite(invoice.total) || invoice.total < 0) {
+      throw new Error('Invoice total must be a finite number >= 0');
+    }
+    if (!['Alış', 'Satış'].includes(invoice.invoice_type)) {
+      throw new Error("Invoice invoice_type must be one of 'Alış', 'Satış'");
+    }
+  }
+
+  _validateFxRate(fxRate) {
+    if (!Number.isInteger(fxRate.year)) {
+      throw new Error('FX rate year must be an integer');
+    }
+    if (!Number.isInteger(fxRate.month) || fxRate.month < 1 || fxRate.month > 12) {
+      throw new Error('FX rate month must be an integer between 1 and 12');
+    }
+    if (!isFinite(fxRate.usd_to_try) || fxRate.usd_to_try < 0) {
+      throw new Error('FX rate usd_to_try must be a finite number >= 0');
+    }
+    if (!isFinite(fxRate.eur_to_try) || fxRate.eur_to_try < 0) {
+      throw new Error('FX rate eur_to_try must be a finite number >= 0');
+    }
+  }
+
   // Invoice operations
   getInvoices(filters = {}) {
     try {
@@ -194,8 +246,14 @@ class DatabaseManager {
     }
   }
 
+  getInvoiceById(id) {
+    const invoice = this.invoices.find(inv => inv.id === Number(id));
+    return invoice || null;
+  }
+
   addInvoice(invoice) {
     try {
+      this._validateInvoice(invoice);
       const id = this.invoices.length > 0 
         ? Math.max(...this.invoices.map(inv => inv.id)) + 1 
         : 1;
@@ -219,6 +277,7 @@ class DatabaseManager {
 
   updateInvoice(id, invoice) {
     try {
+      this._validateInvoice(invoice);
       const index = this.invoices.findIndex(inv => inv.id === Number(id));
       
       if (index !== -1) {
@@ -255,6 +314,38 @@ class DatabaseManager {
     }
   }
 
+  recomputeAllTryEquivalents() {
+    this.invoices = this.invoices.map(invoice => {
+      if (invoice.currency === 'TRY') {
+        invoice.try_equivalent = {
+          subtotal: invoice.subtotal,
+          vat_amount: invoice.subtotal * (invoice.vat_rate / 100),
+          total: invoice.total
+        };
+        return invoice;
+      }
+      const invoiceDate = new Date(invoice.date);
+      const year = invoiceDate.getFullYear();
+      const month = invoiceDate.getMonth() + 1;
+      const fxRate = this.fxRates.find(r => r.year === year && r.month === month);
+      if (fxRate) {
+        let rate = 1;
+        if (invoice.currency === 'USD' && fxRate.usd_to_try) rate = fxRate.usd_to_try;
+        else if (invoice.currency === 'EUR' && fxRate.eur_to_try) rate = fxRate.eur_to_try;
+        invoice.try_equivalent = {
+          subtotal: invoice.subtotal * rate,
+          vat_amount: (invoice.subtotal * (invoice.vat_rate / 100)) * rate,
+          total: invoice.total * rate,
+          rate
+        };
+      } else {
+        invoice.try_equivalent = null;
+      }
+      return invoice;
+    });
+    this.saveInvoices();
+  }
+
   // FX Rate operations
   getFxRates(year, month) {
     try {
@@ -281,6 +372,7 @@ class DatabaseManager {
 
   addFxRate(fxRate) {
     try {
+      this._validateFxRate(fxRate);
       // Check if rate for this month/year already exists
       const existingIndex = this.fxRates.findIndex(
         rate => rate.month === fxRate.month && rate.year === fxRate.year
@@ -293,6 +385,7 @@ class DatabaseManager {
           ...fxRate
         };
         this.saveFxRates();
+        this.recomputeAllTryEquivalents();
         return this.fxRates[existingIndex];
       } else {
         // Add new rate
@@ -303,7 +396,7 @@ class DatabaseManager {
         const newRate = { id, ...fxRate };
         this.fxRates.push(newRate);
         this.saveFxRates();
-        
+        this.recomputeAllTryEquivalents();
         return newRate;
       }
     } catch (error) {
@@ -314,11 +407,13 @@ class DatabaseManager {
 
   updateFxRate(id, fxRate) {
     try {
+      this._validateFxRate(fxRate);
       const index = this.fxRates.findIndex(rate => rate.id === Number(id));
       
       if (index !== -1) {
         this.fxRates[index] = { id: Number(id), ...fxRate };
         this.saveFxRates();
+        this.recomputeAllTryEquivalents();
         return this.fxRates[index];
       } else {
         throw new Error(`FX rate with ID ${id} not found`);
@@ -345,6 +440,7 @@ class DatabaseManager {
         
         this.fxRates.splice(index, 1);
         this.saveFxRates();
+        this.recomputeAllTryEquivalents();
         
         return { 
           id: Number(id), 

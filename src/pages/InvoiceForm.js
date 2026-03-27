@@ -77,16 +77,14 @@ const InvoiceForm = () => {
         message.warning(`${year} yılı ${month}. ay için kur bilgisi bulunamadı. Lütfen Kur Yönetimi sayfasından ekleyin.`);
       }
     } catch (error) {
-      console.error('Error fetching FX rates:', error);
+      // silenced — user-facing warning shown above if rates missing
     }
   };
 
   const fetchInvoice = async (invoiceId) => {
     try {
       setLoading(true);
-      // Get all invoices and find the one with matching ID
-      const invoices = await window.api.getInvoices();
-      const invoice = invoices.find(inv => inv.id === parseInt(invoiceId));
+      const invoice = await window.api.getInvoiceById(parseInt(invoiceId));
       
       if (invoice) {
         setCurrentInvoice(invoice);
@@ -103,7 +101,6 @@ const InvoiceForm = () => {
         navigate('/invoices');
       }
     } catch (error) {
-      console.error('Error fetching invoice:', error);
       message.error('Fatura yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
@@ -135,7 +132,6 @@ const InvoiceForm = () => {
       
       navigate('/invoices');
     } catch (error) {
-      console.error('Error saving invoice:', error);
       message.error('Fatura kaydedilirken bir hata oluştu.');
     } finally {
       setLoading(false);
@@ -172,8 +168,6 @@ const InvoiceForm = () => {
     const trySubtotal = subtotal * rate;
     const tryVatAmount = (subtotal * (vatRate / 100)) * rate;
     const tryTotal = total * rate;
-    
-    console.log('Currency:', currency, 'Rate:', rate, 'TRY Total:', tryTotal);
     
     setTryValues({
       subtotal: trySubtotal,
@@ -247,7 +241,8 @@ const InvoiceForm = () => {
               vat_rate: 0,
               subtotal: 0,
               total: 0,
-              invoice_type: 'Alış'
+              invoice_type: 'Alış',
+              description: ''
             }}
             className="form-container"
           >
@@ -302,6 +297,17 @@ const InvoiceForm = () => {
             </Row>
 
             <Row gutter={16}>
+              <Col span={24}>
+                <Form.Item
+                  name="description"
+                  label="Açıklama"
+                >
+                  <Input.TextArea rows={2} placeholder="İsteğe bağlı açıklama" />
+                </Form.Item>
+              </Col>
+            </Row>
+
+            <Row gutter={16}>
               <Col span={12}>
                 <Form.Item
                   name="vat_rate"
@@ -310,9 +316,9 @@ const InvoiceForm = () => {
                 >
                   <Select onChange={calculateTotal}>
                     <Option value={0}>0%</Option>
-                    <Option value={5}>5%</Option>
+                    <Option value={1}>1%</Option>
+                    <Option value={8}>8%</Option>
                     <Option value={10}>10%</Option>
-                    <Option value={16}>16%</Option>
                     <Option value={20}>20%</Option>
                   </Select>
                 </Form.Item>

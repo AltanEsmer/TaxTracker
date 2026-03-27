@@ -15,15 +15,16 @@ body {
 
 .logo {
   float: left;
-  width: 120px;
-  height: 31px;
-  margin: 16px 24px 16px 0;
-  background: rgba(255, 255, 255, 0.2);
+  height: 64px;
+  margin-right: 24px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: bold;
+}
+
+.logo-img {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 .ant-row-rtl .logo {

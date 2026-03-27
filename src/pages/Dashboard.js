@@ -72,7 +72,6 @@ const Dashboard = () => {
         activeType
       }));
     } catch (error) {
-      console.warn('Failed to save filters to localStorage:', error);
     }
   };
 
@@ -90,7 +89,6 @@ const Dashboard = () => {
         };
       }
     } catch (error) {
-      console.warn('Failed to load filters from localStorage:', error);
     }
     return null;
   };
@@ -132,10 +130,8 @@ const Dashboard = () => {
         endDate: dateRange[1].format('YYYY-MM-DD')
       };
       
-      console.log('Fetching dashboard data with filters:', filters);
       const data = await window.api.getDashboardData(filters);
       
-      console.log('Dashboard data received:', data);
       
       // Validate data structure
       if (!data) {
@@ -150,11 +146,9 @@ const Dashboard = () => {
         rawInvoices: data.rawInvoices || [] // Added rawInvoices for new calculation logic
       };
       
-      console.log('Validated dashboard data:', validatedData);
       setDashboardData(validatedData);
       setError(null);
     } catch (err) {
-      console.error('Error fetching dashboard data:', err);
       setError('Veri yüklenirken bir hata oluştu: ' + err.message);
       setDashboardData(null);
     } finally {
@@ -182,7 +176,6 @@ const Dashboard = () => {
       data = data.filter(item => (item.invoice_type || 'Alış') === type);
     }
     
-    console.log('VAT chart data for type:', type, 'records:', data.length);
     
     // If no data after filtering, return empty chart
     if (data.length === 0) {
@@ -391,8 +384,6 @@ const Dashboard = () => {
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    // Log for verification
-    console.log('Dashboard KDV calculation, type:', type, 'records:', filteredData.length);
     const total = filteredData.reduce((sum, item) => {
       const vatAmount = Number(item.try_equivalent?.vat_amount || item.vat_amount) || 0;
       return sum + vatAmount;
@@ -406,8 +397,6 @@ const Dashboard = () => {
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    // Log for verification
-    console.log('Dashboard Fatura Sayısı calculation, type:', type, 'records:', filteredData.length);
     return filteredData.reduce((sum, item) => {
       const count = Number(item.try_equivalent?.count || item.count) || 0;
       return sum + count;
@@ -420,8 +409,6 @@ const Dashboard = () => {
     if (type) {
       filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
     }
-    // Log for verification
-    console.log('Dashboard Toplam Tutar calculation, type:', type, 'records:', filteredData.length);
     const total = filteredData.reduce((sum, item) => {
       const amount = Number(item.try_equivalent?.total || item.total) || 0;
       return sum + amount;
@@ -795,7 +782,6 @@ const Dashboard = () => {
         defaultActiveKey="all" 
         activeKey={activeType === 'Tümü' ? 'all' : activeType === 'Alış' ? 'buying' : 'selling'}
         onChange={key => {
-          console.log('Tab changed to:', key);
           let newActiveType = 'Tümü';
           if (key === 'all') newActiveType = 'Tümü';
           else if (key === 'buying') newActiveType = 'Alış';

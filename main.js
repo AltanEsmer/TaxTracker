@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, Menu, Tray, dialog } = require('electron');
 const path = require('path');
-const isDev = process.defaultApp || /node_modules[\\/]electron[\\/]/.test(process.execPath);
+const isDev = require('electron-is-dev');
 const fs = require('fs');
 const DatabaseManager = require('./database');
+const XLSX = require('xlsx');
 
 // Initialize the database
 const db = new DatabaseManager();
@@ -220,6 +221,9 @@ ipcMain.handle('get-invoices', async (event, filters) => {
 
 ipcMain.handle('add-invoice', async (event, invoice) => {
   try {
+    if (!invoice || typeof invoice !== 'object') {
+      throw new Error('Invalid invoice data');
+    }
     return db.addInvoice(invoice);
   } catch (error) {
     console.error('Error in add-invoice:', error);
@@ -229,6 +233,12 @@ ipcMain.handle('add-invoice', async (event, invoice) => {
 
 ipcMain.handle('update-invoice', async (event, id, invoice) => {
   try {
+    if (id === undefined || id === null) {
+      throw new Error('Invoice ID is required');
+    }
+    if (!invoice || typeof invoice !== 'object') {
+      throw new Error('Invalid invoice data');
+    }
     return db.updateInvoice(id, invoice);
   } catch (error) {
     console.error('Error in update-invoice:', error);
@@ -238,9 +248,24 @@ ipcMain.handle('update-invoice', async (event, id, invoice) => {
 
 ipcMain.handle('delete-invoice', async (event, id) => {
   try {
+    if (id === undefined || id === null) {
+      throw new Error('Invoice ID is required');
+    }
     return db.deleteInvoice(id);
   } catch (error) {
     console.error('Error in delete-invoice:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('get-invoice-by-id', async (event, id) => {
+  try {
+    if (id === undefined || id === null) {
+      throw new Error('Invoice ID is required');
+    }
+    return db.getInvoiceById(id);
+  } catch (error) {
+    console.error('Error in get-invoice-by-id:', error);
     throw error;
   }
 });
@@ -256,6 +281,9 @@ ipcMain.handle('get-fx-rates', async (event, year, month) => {
 
 ipcMain.handle('add-fx-rate', async (event, fxRate) => {
   try {
+    if (!fxRate || typeof fxRate !== 'object') {
+      throw new Error('Invalid FX rate data');
+    }
     return db.addFxRate(fxRate);
   } catch (error) {
     console.error('Error in add-fx-rate:', error);
@@ -265,6 +293,12 @@ ipcMain.handle('add-fx-rate', async (event, fxRate) => {
 
 ipcMain.handle('update-fx-rate', async (event, id, fxRate) => {
   try {
+    if (id === undefined || id === null) {
+      throw new Error('FX rate ID is required');
+    }
+    if (!fxRate || typeof fxRate !== 'object') {
+      throw new Error('Invalid FX rate data');
+    }
     return db.updateFxRate(id, fxRate);
   } catch (error) {
     console.error('Error in update-fx-rate:', error);
@@ -274,9 +308,44 @@ ipcMain.handle('update-fx-rate', async (event, id, fxRate) => {
 
 ipcMain.handle('delete-fx-rate', async (event, id) => {
   try {
+    if (id === undefined || id === null) {
+      throw new Error('FX rate ID is required');
+    }
     return db.deleteFxRate(id);
   } catch (error) {
     console.error('Error in delete-fx-rate:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('show-save-dialog', async (event, options) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, options);
+    return result.filePath || null;
+  } catch (error) {
+    console.error('Error in show-save-dialog:', error);
+    throw error;
+  }
+});
+
+ipcMain.handle('export-to-excel', async (event, data, filePath) => {
+  try {
+    if (!filePath || !data) {
+      throw new Error('File path and data are required');
+    }
+    const ws = XLSX.utils.json_to_sheet(data.rows);
+    if (data.totalRow) {
+      XLSX.utils.sheet_add_json(ws, [data.totalRow], { skipHeader: true, origin: data.rows.length + 1 });
+    }
+    if (data.colWidths) {
+      ws['!cols'] = data.colWidths;
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, data.sheetName || 'Sheet1');
+    XLSX.writeFile(wb, filePath);
+    return true;
+  } catch (error) {
+    console.error('Error in export-to-excel:', error);
     throw error;
   }
 });

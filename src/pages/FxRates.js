@@ -43,11 +43,8 @@ const FxRates = () => {
       setLoading(false);
       return;
     }
-    // Generate years (2025 to 2030)
-    const yearOptions = [];
-    for (let year = 2025; year <= 2030; year++) {
-      yearOptions.push(year);
-    }
+    const currentYear = dayjs().year();
+    const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
     setYears(yearOptions);
     
     // Generate months
@@ -66,7 +63,7 @@ const FxRates = () => {
       const data = await window.api.getFxRates();
       setFxRates(data);
     } catch (error) {
-      console.error('Error fetching FX rates:', error);
+
       message.error('Kur bilgileri yüklenirken bir hata oluştu.');
     } finally {
       setLoading(false);
@@ -137,7 +134,7 @@ const FxRates = () => {
       // Refresh data
       fetchFxRates();
     } catch (error) {
-      console.error('Error saving FX rate:', error);
+
       message.error('Kur bilgisi kaydedilirken bir hata oluştu.');
       setLoading(false);
     }
@@ -174,7 +171,7 @@ const FxRates = () => {
       
       fetchFxRates();
     } catch (error) {
-      console.error('Error deleting FX rate:', error);
+
       message.error('Kur bilgisi silinirken bir hata oluştu.');
     }
   };
@@ -259,10 +256,7 @@ const FxRates = () => {
               layout="horizontal"
               onFinish={handleSubmit}
               initialValues={{
-                year: (() => {
-                  const currentYear = new Date().getFullYear();
-                  return currentYear >= 2025 && currentYear <= 2030 ? currentYear : 2025;
-                })(),
+                year: dayjs().year(),
                 month: new Date().getMonth() + 1,
                 usd_to_try: 0,
                 eur_to_try: 0
