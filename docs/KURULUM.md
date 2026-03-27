@@ -6,7 +6,7 @@ Bu rehber, Fatura Kayıt ve KDV Takip Uygulaması'nın kurulumu ve çalıştır�
 
 Uygulamayı çalıştırmak için aşağıdaki yazılımların bilgisayarınızda kurulu olması gerekmektedir:
 
-- [Node.js](https://nodejs.org/) (v14.0.0 veya üzeri)
+- [Node.js](https://nodejs.org/) (v18 LTS veya v20 LTS önerilir)
 - [npm](https://www.npmjs.com/) (Node.js ile birlikte gelir)
 
 ## Kurulum Adımları
@@ -47,13 +47,12 @@ Bu komut, hem Electron uygulamasını hem de React geliştirme sunucusunu başla
 Uygulamanın dağıtılabilir paketini oluşturmak için aşağıdaki komutu kullanın:
 
 ```bash
-npm run dist
+npm run build
 ```
 
 Bu işlem tamamlandığında, `release` klasöründe kurulum dosyası oluşturulacaktır:
 
-- **Windows**: `release/Tax Tracker Setup 1.0.0.exe`
-- **macOS**: `release/Tax Tracker-1.0.0.dmg` (macOS'ta derleme yapıldığında)
+- **Windows**: `release/Tax Tracker-Setup-1.0.0.exe`
 
 ## Kullanım
 
@@ -66,10 +65,13 @@ Uygulama başlatıldığında, ana ekranda bir dashboard göreceksiniz. Üst men
 
 ## Veri Depolama
 
-Uygulama, verileri yerel bir SQLite veritabanında saklar. Veritabanı dosyası aşağıdaki konumlarda bulunur:
+Uygulama, verileri yerel JSON dosyalarında saklar. Veri dosyaları aşağıdaki konumlarda bulunur:
 
-- **Windows**: `%APPDATA%\tax-tracker\taxtracker.db`
-- **macOS**: `~/Library/Application Support/tax-tracker/taxtracker.db`
+- **Windows**: `%APPDATA%\tax-tracker\taxtracker-data\`
+  - `invoices.json` — Fatura kayıtları
+  - `fxrates.json` — Aylık döviz kuru kayıtları
+
+> **Not:** Geliştirme modunda veriler `%APPDATA%\Electron\taxtracker-data\` klasöründe saklanır. İlk üretim sürümü çalıştırıldığında bu veriler otomatik olarak aktarılır.
 
 ## Sorun Giderme
 
@@ -89,14 +91,8 @@ Uygulamayı derlerken sorunlar yaşıyorsanız:
    - Windows Görev Yöneticisi'nden tüm node.exe ve electron.exe süreçlerini sonlandırın.
 
 2. **Node.js Sürüm Uyumsuzluğu:**
-   - Node.js'in LTS sürümünü (v14.x, v16.x veya v18.x) kullanın.
-   - Çok yeni Node.js sürümleri (v20+) bazı modüllerle uyumsuzluk yaşayabilir.
-
-3. **better-sqlite3 Kurulum Sorunları:**
-   - Eğer better-sqlite3 modülü ile ilgili sorunlar yaşıyorsanız, aşağıdaki komutu deneyin:
-   ```bash
-   npm install --build-from-source better-sqlite3
-   ```
+   - Node.js LTS sürümünü (v18.x veya v20.x) kullanın.
+   - Node.js v22+ bazı native modüllerle uyumsuzluk yaşayabilir.
 
 ## Güncelleme
 
