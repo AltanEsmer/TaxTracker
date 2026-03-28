@@ -1,3 +1,4 @@
+extends: null
 appId: com.taxtracker.app
 productName: Tax Tracker
 copyright: Copyright © 2025
@@ -12,8 +13,6 @@ files:
   - "preload.js"
   - "database.js"
   - "package.json"
-  - "node_modules/**/*"
-  - "!node_modules/.cache/**/*"
 
 extraMetadata:
   main: "main.js"
