@@ -3,7 +3,7 @@ const path = require('path');
 const isDev = require('electron-is-dev');
 const fs = require('fs');
 const DatabaseManager = require('./database');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 
 // Initialize the database
 const db = new DatabaseManager();
@@ -330,19 +330,151 @@ ipcMain.handle('show-save-dialog', async (event, options) => {
 
 ipcMain.handle('export-to-excel', async (event, data, filePath) => {
   try {
-    if (!filePath || !data) {
-      throw new Error('File path and data are required');
-    }
-    const ws = XLSX.utils.json_to_sheet(data.rows);
-    if (data.totalRow) {
-      XLSX.utils.sheet_add_json(ws, [data.totalRow], { skipHeader: true, origin: data.rows.length + 1 });
-    }
-    if (data.colWidths) {
-      ws['!cols'] = data.colWidths;
-    }
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, data.sheetName || 'Sheet1');
-    XLSX.writeFile(wb, filePath);
+    if (!filePath || !data) throw new Error('File path and data are required');
+
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'TaxTracker';
+    workbook.created = new Date();
+
+    const worksheet = workbook.addWorksheet(data.sheetName || 'Faturalar', {
+      views: [{ state: 'frozen', ySplit: 2 }],
+    });
+
+    // ── Theme ────────────────────────────────────────────────────────────────────
+    const NAVY  = 'FF1F3864';
+    const BLUE  = 'FF2E75B6';
+    const LBLUE = 'FFDCE6F1';
+    const WHITE = 'FFFFFFFF';
+    const BLACK = 'FF000000';
+    const NAVY_BORDER  = 'FF1A5276';
+    const LIGHT_BORDER = 'FFB8B8B8';
+
+    const colDefs = [
+      { key: 'Tarih',             width: 14 },
+      { key: 'Fatura Tip',        width: 13 },
+      { key: 'Şirket',            width: 24 },
+      { key: 'Fatura No',         width: 16 },
+      { key: 'Para Birim',        width: 12 },
+      { key: 'Ara Toplam',        width: 15 },
+      { key: 'KDV Oranı',         width: 14 },
+      { key: 'KDV Tutar',         width: 15 },
+      { key: 'Genel Toplam',      width: 16 },
+      { key: 'Ara Toplam (TL)',   width: 18 },
+      { key: 'KDV Tutar (TL)',    width: 18 },
+      { key: 'Genel Toplam (TL)', width: 20 },
+    ];
+    const headers = [
+      'Tarih', 'Fatura Tip', 'Şirket', 'Fatura No', 'Para Birim',
+      'Ara Toplam', 'KDV Oranı (%)', 'KDV Tutar', 'Genel Toplam',
+      'Ara Toplam (TL)', 'KDV Tutar (TL)', 'Genel Toplam (TL)',
+    ];
+    const numCols = colDefs.length;
+
+    // Number format: currency columns (indices 1-based)
+    const currencyFmt = '#,##0.00';
+    const pctFmt = '0.00"%"';
+    const currencyCols = [6, 8, 9, 10, 11, 12];
+    const pctCols = [7];
+
+    const toNum = (val) => (typeof val === 'string' ? parseFloat(val) || 0 : (val || 0));
+
+    // ── Row 1: Report title ──────────────────────────────────────────────────────
+    const exportDate = new Date().toLocaleDateString('tr-TR', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+    });
+    const titleRow = worksheet.addRow([`FATURA RAPORU — ${exportDate}`]);
+    titleRow.height = 30;
+    worksheet.mergeCells(1, 1, 1, numCols);
+    const titleCell = titleRow.getCell(1);
+    titleCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+    titleCell.font      = { bold: true, size: 14, color: { argb: WHITE }, name: 'Calibri' };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // ── Row 2: Column headers ────────────────────────────────────────────────────
+    worksheet.columns = colDefs;
+    const headerRow = worksheet.addRow(headers);
+    headerRow.height = 22;
+    headerRow.eachCell({ includeEmpty: true }, (cell) => {
+      cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLUE } };
+      cell.font      = { bold: true, size: 10, color: { argb: WHITE }, name: 'Calibri' };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border    = {
+        top:    { style: 'medium', color: { argb: NAVY } },
+        left:   { style: 'thin',   color: { argb: NAVY_BORDER } },
+        bottom: { style: 'medium', color: { argb: NAVY } },
+        right:  { style: 'thin',   color: { argb: NAVY_BORDER } },
+      };
+    });
+
+    // ── Data rows ────────────────────────────────────────────────────────────────
+    data.rows.forEach((row, index) => {
+      const bg = index % 2 === 0 ? WHITE : LBLUE;
+      const dataRow = worksheet.addRow([
+        row['Tarih'],
+        row['Fatura Tip'],
+        row['Şirket'],
+        row['Fatura No'],
+        row['Para Birim'],
+        toNum(row['Ara Toplam']),
+        toNum(row['KDV Oranı']),
+        toNum(row['KDV Tutar']),
+        toNum(row['Genel Toplam']),
+        toNum(row['Ara Toplam (TL)']),
+        toNum(row['KDV Tutar (TL)']),
+        toNum(row['Genel Toplam (TL)']),
+      ]);
+      dataRow.height = 18;
+      dataRow.eachCell({ includeEmpty: true }, (cell, col) => {
+        cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+        cell.font   = { size: 10, name: 'Calibri', color: { argb: BLACK } };
+        cell.border = {
+          top:    { style: 'thin', color: { argb: LIGHT_BORDER } },
+          left:   { style: 'thin', color: { argb: LIGHT_BORDER } },
+          bottom: { style: 'thin', color: { argb: LIGHT_BORDER } },
+          right:  { style: 'thin', color: { argb: LIGHT_BORDER } },
+        };
+        if (currencyCols.includes(col)) {
+          cell.numFmt    = currencyFmt;
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        } else if (pctCols.includes(col)) {
+          cell.numFmt    = pctFmt;
+          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle' };
+        }
+      });
+    });
+
+    // ── Spacer row ───────────────────────────────────────────────────────────────
+    const spacer = worksheet.addRow([]);
+    spacer.height = 8;
+
+    // ── Totals row ───────────────────────────────────────────────────────────────
+    const totalsRow = worksheet.addRow([
+      'TOPLAM', '', '', '', '', '', '', '', '',
+      toNum(data.totalRow['Ara Toplam (TL)']),
+      toNum(data.totalRow['KDV Tutar (TL)']),
+      toNum(data.totalRow['Genel Toplam (TL)']),
+    ]);
+    totalsRow.height = 24;
+    totalsRow.eachCell({ includeEmpty: true }, (cell, col) => {
+      cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLUE } };
+      cell.font   = { bold: true, size: 11, name: 'Calibri', color: { argb: WHITE } };
+      cell.border = {
+        top:    { style: 'medium', color: { argb: NAVY } },
+        left:   { style: 'thin',   color: { argb: NAVY_BORDER } },
+        bottom: { style: 'medium', color: { argb: NAVY } },
+        right:  { style: 'thin',   color: { argb: NAVY_BORDER } },
+      };
+      if ([10, 11, 12].includes(col)) {
+        cell.numFmt    = currencyFmt;
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' };
+      }
+    });
+
+    await workbook.xlsx.writeFile(filePath);
     return true;
   } catch (error) {
     console.error('Error in export-to-excel:', error);

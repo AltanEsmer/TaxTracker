@@ -1,154 +1,397 @@
+/* src/index.css — TaxTracker Design Tokens */
+
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+
+:root {
+  /* ── Brand ─────────────────────── */
+  --color-accent:         #2563EB;
+  --color-accent-hover:   #1D4ED8;
+  --color-accent-subtle:  #EFF6FF;
+
+  /* ── Semantic ──────────────────── */
+  --color-success:        #16A34A;
+  --color-success-bg:     #F0FDF4;
+  --color-danger:         #DC2626;
+  --color-danger-bg:      #FEF2F2;
+  --color-warning:        #D97706;
+  --color-warning-bg:     #FFFBEB;
+
+  /* ── Neutrals ──────────────────── */
+  --color-bg-base:        #F8FAFC;
+  --color-bg-card:        #FFFFFF;
+  --color-bg-subtle:      #F1F5F9;
+  --color-border:         #E2E8F0;
+  --color-border-strong:  #CBD5E1;
+
+  /* ── Text ──────────────────────── */
+  --color-text-primary:   #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted:     #94A3B8;
+  --color-text-inverse:   #FFFFFF;
+
+  /* ── Typography ────────────────── */
+  --font-family:          'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-xs:         11px;
+  --font-size-sm:         12px;
+  --font-size-base:       14px;
+  --font-size-md:         15px;
+  --font-size-lg:         18px;
+  --font-size-xl:         22px;
+  --font-size-2xl:        28px;
+  --font-size-3xl:        36px;
+  --font-weight-normal:   400;
+  --font-weight-medium:   500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:     700;
+  --line-height-base:     1.5;
+  --letter-spacing-tight: -0.02em;
+  --letter-spacing-wide:   0.04em;
+
+  /* ── Spacing ───────────────────── */
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ── Border Radius ─────────────── */
+  --radius-sm:   4px;
+  --radius-md:   8px;
+  --radius-lg:  12px;
+  --radius-xl:  16px;
+  --radius-full: 9999px;
+
+  /* ── Shadows ───────────────────── */
+  --shadow-xs:    0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-sm:    0 1px 3px 0 rgba(15, 23, 42, 0.08), 0 1px 2px -1px rgba(15, 23, 42, 0.06);
+  --shadow-md:    0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg:    0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-focus: 0 0 0 3px rgba(37, 99, 235, 0.2);
+
+  /* ── Transitions ───────────────── */
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.35s ease;
+
+  /* ── Layout ────────────────────── */
+  --sidebar-width:           220px;
+  --sidebar-width-collapsed:  64px;
+  --header-height:            64px;
+  --content-max-width:      1440px;
+}
+
+/* ── Dark mode overrides ─────────────────── */
+[data-theme="dark"] {
+  --color-bg-base:        #0F172A;
+  --color-bg-card:        #1E293B;
+  --color-bg-subtle:      #293548;
+  --color-border:         #334155;
+  --color-border-strong:  #475569;
+  --color-text-primary:   #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted:     #64748B;
+  --color-accent-subtle:  #1E3A5F;
+  --color-success-bg:     #14532D;
+  --color-danger-bg:      #450A0A;
+  --color-warning-bg:     #451A03;
+}
+
+/* ── Global base ─────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
 body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
+  font-family:             var(--font-family);
+  font-size:               var(--font-size-base);
+  font-weight:             var(--font-weight-normal);
+  line-height:             var(--line-height-base);
+  color:                   var(--color-text-primary);
+  background-color:        var(--color-bg-base);
+  -webkit-font-smoothing:  antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-.site-layout-content {
-  min-height: 280px;
-  padding: 24px;
-  background: #fff;
+/* Base styles for layouts */
+.page-wrapper {
+  padding: var(--space-6);          /* 24px all sides */
+  max-width: 1440px;
+  margin: 0 auto;
 }
 
-.logo {
-  float: left;
-  height: 64px;
-  margin-right: 24px;
+.page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
 }
 
-.logo-img {
-  height: 40px;
-  width: auto;
-  object-fit: contain;
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);              /* 16px */
 }
 
-.ant-row-rtl .logo {
-  float: right;
-  margin: 16px 0 16px 24px;
+.chart-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;  /* Bar chart wide, pie chart narrow */
+  gap: var(--space-4);
 }
 
-.content-container {
-  padding: 24px;
+/* 7.1 Cards */
+.card {
+  background:    var(--color-bg-card);
+  border:        1px solid var(--color-border);
+  border-radius: var(--radius-lg);      /* 12px */
+  box-shadow:    var(--shadow-xs);
+  transition:    box-shadow 0.2s ease;
 }
 
+.card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.card-header {
+  padding:       var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  font-size:     var(--font-size-base);
+  font-weight:   var(--font-weight-semibold);
+  color:         var(--color-text-primary);
+  background:    transparent;
+}
+
+.card-body {
+  padding: var(--space-5);
+}
+
+.kpi-card {
+  border-left: 3px solid var(--color-accent);
+}
+.kpi-card.success { border-left-color: var(--color-success); }
+.kpi-card.danger  { border-left-color: var(--color-danger);  }
+
+/* 7.2 Buttons */
+.btn-primary {
+  background:    var(--color-accent);
+  color:         var(--color-text-inverse);
+  border:        none;
+  border-radius: var(--radius-md);    /* 8px */
+  font-weight:   var(--font-weight-medium);
+  padding:       var(--space-2) var(--space-4);
+  transition:    background 0.15s ease, box-shadow 0.15s ease;
+}
+.btn-primary:hover  { background: var(--color-accent-hover); }
+.btn-primary:focus  { box-shadow: var(--shadow-focus); }
+
+.btn-secondary {
+  background:    transparent;
+  color:         var(--color-text-primary);
+  border:        1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+}
+.btn-secondary:hover { background: var(--color-bg-subtle); }
+
+.btn-danger {
+  background: transparent;
+  color:      var(--color-danger);
+  border:     1px solid var(--color-danger);
+}
+
+/* 7.3 Navigation (Sidebar) */
+.sidebar {
+  width:      220px;
+  background: var(--color-bg-card);
+  border-right: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
+  display:    flex;
+  flex-direction: column;
+  transition: width 0.2s ease;
+}
+
+.sidebar.collapsed { width: 64px; }
+
+.nav-item {
+  display:       flex;
+  align-items:   center;
+  gap:           var(--space-3);
+  padding:       var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  color:         var(--color-text-secondary);
+  font-weight:   var(--font-weight-medium);
+  font-size:     var(--font-size-base);
+  cursor:        pointer;
+  transition:    background 0.15s, color 0.15s;
+  margin:        var(--space-1) var(--space-2);
+}
+
+.nav-item:hover {
+  background: var(--color-bg-subtle);
+  color:      var(--color-text-primary);
+}
+
+.nav-item.active {
+  background:  var(--color-accent-subtle);
+  color:       var(--color-accent);
+  border-left: 3px solid var(--color-accent);
+}
+
+/* 7.4 Data Tables */
+.ant-table-thead > tr > th {
+  background:    var(--color-bg-subtle) !important;
+  color:         var(--color-text-secondary) !important;
+  font-size:     var(--font-size-xs) !important;
+  font-weight:   var(--font-weight-semibold) !important;
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  border-bottom: 2px solid var(--color-border) !important;
+}
+
+.ant-table-tbody > tr > td {
+  font-size:  var(--font-size-base);
+  color:      var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: var(--color-bg-subtle) !important;
+}
+
+/* 7.5 Invoice Type Tags */
+.tag-alis  { /* Purchases */
+  background: var(--color-accent-subtle) !important;
+  color:      var(--color-accent) !important;
+  border:     1px solid #BFDBFE !important;
+  border-radius: var(--radius-full) !important;
+  padding: 2px 10px !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+.tag-satis { /* Sales */
+  background: var(--color-success-bg) !important;
+  color:      var(--color-success) !important;
+  border:     1px solid #BBF7D0 !important;
+  border-radius: var(--radius-full) !important;
+  padding: 2px 10px !important;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-medium) !important;
+}
+
+/* 7.6 Form Fields */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-picker {
+  border-radius: var(--radius-md) !important;
+  border-color:  var(--color-border) !important;
+  background:    var(--color-bg-subtle) !important;
+  font-size:     var(--font-size-base) !important;
+  transition:    border-color 0.15s, box-shadow 0.15s !important;
+}
+
+.ant-input:focus,
+.ant-input-number-focused,
+.ant-select-focused .ant-select-selector,
+.ant-picker-focused {
+  border-color: var(--color-accent) !important;
+  box-shadow:   var(--shadow-focus) !important;
+  background:   var(--color-bg-card) !important;
+}
+
+/* 9. Animations & Microinteractions */
+.kpi-number {
+  transition: color var(--transition-base);
+}
+
+@keyframes fadeInRow {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ant-table-tbody > tr {
+  animation: fadeInRow 0.2s ease both;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.page-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Backward compatibility mapping to avoid breaking current components immediately */
 .form-container {
   max-width: 800px;
   margin: 0 auto;
 }
-
-/* Form field improvements */
 .form-container .ant-form-item-label > label {
   font-weight: 500;
-  color: #262626;
+  color: var(--color-text-primary);
 }
-
 .form-container .ant-form-item-label > label.ant-form-item-required::before {
-  color: #ff4d4f;
+  color: var(--color-danger);
 }
-
-/* Highlight KDV and Currency fields */
-.form-container .ant-form-item:has([name="vat_rate"]) .ant-form-item-label > label,
-.form-container .ant-form-item:has([name="currency"]) .ant-form-item-label > label {
-  font-weight: 600;
-  color: #1890ff;
-}
-
-.form-container .ant-form-item:has([name="vat_rate"]) .ant-select,
-.form-container .ant-form-item:has([name="currency"]) .ant-select {
-  border-color: #1890ff;
-  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
-}
-
-/* Small text styling for TL equivalents */
-.form-container small {
-  font-size: 12px;
-  color: #8c8c8c;
-  line-height: 1.4;
-}
-
-.chart-container {
-  margin-bottom: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  transition: box-shadow 0.3s ease;
-}
-
-.chart-container:hover {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+.date-range-picker {
+  margin-bottom: var(--space-6);
 }
 
 .chart-container .ant-card-head {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border-bottom: none;
-  padding: 16px 20px;
-  border-radius: 8px 8px 0 0;
-  font-weight: 600;
-  font-size: 16px;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  background: transparent;
 }
-
 .chart-container .ant-card-head-title {
-  color: white;
-}
-
-.chart-container .ant-card-body {
-  padding: 20px;
+  color: var(--color-text-primary);
 }
 
 .dashboard-card {
   margin-bottom: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-radius: 8px;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  border: none;
+  box-shadow: var(--shadow-xs);
+  border-radius: var(--radius-lg);
+  transition: box-shadow 0.2s ease;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
 }
 
 .dashboard-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-sm);
+  transform: none; /* remove translateY */
 }
 
 .dashboard-card .ant-statistic-title {
-  font-size: 14px;
-  margin-bottom: 8px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-2);
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
 }
 
 .dashboard-card .ant-statistic-content {
-  font-size: 28px;
+  font-size: var(--font-size-2xl);
   font-weight: bold;
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text-primary);
 }
-
-.date-range-picker {
-  margin-bottom: 24px;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-/* Invoice type separator styling */
-.invoice-type-separator td {
-  border-top: 3px solid #f0f0f0 !important;
-  background-color: #fafafa;
-}
-
-.invoice-type-separator:hover td {
-  border-top: 3px solid #e6f7ff !important;
-  background-color: #f0f8ff;
-}
-
-/* Table improvements */
-.ant-table-thead > tr > th {
-  background-color: #fafafa;
-  font-weight: 600;
-}
-
-.ant-table-tbody > tr:hover > td {
-  background-color: #f5f5f5;
-} 

@@ -233,7 +233,7 @@ const InvoiceList = () => {
           'Ara Toplam': typeof invoice.subtotal === 'number' ? invoice.subtotal.toFixed(2) : invoice.subtotal,
           'KDV Oranı': typeof invoice.vat_rate === 'number' ? invoice.vat_rate.toFixed(2) : invoice.vat_rate,
           'KDV Tutar': typeof vatAmount === 'number' ? vatAmount.toFixed(2) : vatAmount,
-          'Genel Top': typeof invoice.total === 'number' ? invoice.total.toFixed(2) : invoice.total,
+          'Genel Toplam': typeof invoice.total === 'number' ? invoice.total.toFixed(2) : invoice.total,
           'Ara Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof trySubtotal === 'number' ? trySubtotal.toFixed(2) : trySubtotal) : 'KUR EKSIK',
           'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryVatAmount === 'number' ? tryVatAmount.toFixed(2) : tryVatAmount) : 'KUR EKSIK',
           'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryTotal === 'number' ? tryTotal.toFixed(2) : tryTotal) : 'KUR EKSIK'
@@ -249,7 +249,7 @@ const InvoiceList = () => {
         'Ara Toplam': '',
         'KDV Oranı': '',
         'KDV Tutar': '',
-        'Genel Top': '',
+        'Genel Toplam': '',
         'Ara Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Ara Toplam (TL)'] || 0), 0).toFixed(2),
         'KDV Tutar (TL)': exportData.reduce((sum, row) => sum + Number(row['KDV Tutar (TL)'] || 0), 0).toFixed(2),
         'Genel Toplam (TL)': exportData.reduce((sum, row) => sum + Number(row['Genel Toplam (TL)'] || 0), 0).toFixed(2)
@@ -287,8 +287,8 @@ const InvoiceList = () => {
       dataIndex: 'invoice_type',
       key: 'invoice_type',
       render: text => {
-        const color = text === 'Alış' ? 'blue' : 'green';
-        return <Tag color={color}>{text || 'Alış'}</Tag>;
+        const className = text === 'Alış' ? 'tag-alis' : 'tag-satis';
+        return <Tag className={className}>{text || 'Alış'}</Tag>;
       },
       sorter: (a, b) => (a.invoice_type || 'Alış').localeCompare(b.invoice_type || 'Alış')
     },
@@ -310,7 +310,7 @@ const InvoiceList = () => {
       render: (text, record) => (
         <>
           <div>{typeof text === 'number' ? text.toFixed(2) : '-'} {record.currency}</div>
-          <small style={{ color: '#888' }}>
+          <small style={{ color: 'var(--color-text-muted)' }}>
             {record.try_equivalent && typeof record.try_equivalent.subtotal === 'number' ? record.try_equivalent.subtotal.toFixed(2) : '-'} TL
           </small>
         </>
@@ -332,7 +332,7 @@ const InvoiceList = () => {
         return (
           <>
             <div>{typeof vatAmount === 'number' ? vatAmount.toFixed(2) : '-'} {record.currency}</div>
-            <small style={{ color: '#888' }}>
+            <small style={{ color: 'var(--color-text-muted)' }}>
               {record.try_equivalent && typeof record.try_equivalent.vat_amount === 'number' ? record.try_equivalent.vat_amount.toFixed(2) : '-'} TL
             </small>
           </>
@@ -347,7 +347,7 @@ const InvoiceList = () => {
       render: (text, record) => (
         <>
           <div>{typeof text === 'number' ? text.toFixed(2) : '-'} {record.currency}</div>
-          <small style={{ color: '#888' }}>
+          <small style={{ color: 'var(--color-text-muted)' }}>
             {record.try_equivalent && typeof record.try_equivalent.total === 'number' ? record.try_equivalent.total.toFixed(2) : '-'} TL
           </small>
         </>
@@ -467,12 +467,12 @@ const InvoiceList = () => {
         </Col>
       </Row>
 
-      <style jsx global>{`
+      <style>{`
         .invoice-type-separator td {
-          border-top: 3px solid #f0f0f0;
+          border-top: 3px solid var(--color-border);
         }
         .ant-table-row:hover .invoice-type-separator {
-          border-top: 3px solid #f0f0f0;
+          border-top: 3px solid var(--color-border);
         }
       `}</style>
 
@@ -509,7 +509,7 @@ const InvoiceList = () => {
 
       <Row gutter={16} style={{ marginTop: 24 }}>
         <Col span={8}>
-          <Card>
+          <Card className="dashboard-card">
             <Statistic 
               title="Toplam Ara Toplam (TL)" 
               value={typeof totals.subtotal === 'number' ? totals.subtotal : 0} 
@@ -519,7 +519,7 @@ const InvoiceList = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card>
+          <Card className="dashboard-card">
             <Statistic 
               title="Toplam KDV (TL)" 
               value={typeof totals.vatAmount === 'number' ? totals.vatAmount : 0} 
@@ -529,7 +529,7 @@ const InvoiceList = () => {
           </Card>
         </Col>
         <Col span={8}>
-          <Card>
+          <Card className="dashboard-card">
             <Statistic 
               title="Toplam Genel Toplam (TL)" 
               value={typeof totals.total === 'number' ? totals.total : 0} 

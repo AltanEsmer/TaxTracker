@@ -250,7 +250,7 @@ const FxRates = () => {
 
       <Row gutter={16}>
         <Col span={24}>
-          <Card title={editingId ? 'Kur Bilgisi Düzenle' : 'Yeni Kur Bilgisi Ekle'} style={{ marginBottom: 24 }}>
+          <Card title={editingId ? 'Kur Bilgisi Düzenle' : 'Yeni Kur Bilgisi Ekle'} style={{ marginBottom: 'var(--space-6)' }}>
             <Form
               form={form}
               layout="horizontal"

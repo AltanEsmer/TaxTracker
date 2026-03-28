@@ -316,14 +316,14 @@ const InvoiceForm = () => {
                 >
                   <Select onChange={calculateTotal}>
                     <Option value={0}>0%</Option>
-                    <Option value={1}>1%</Option>
-                    <Option value={8}>8%</Option>
+                    <Option value={5}>5%</Option>
                     <Option value={10}>10%</Option>
+                    <Option value={15}>15%</Option>
                     <Option value={20}>20%</Option>
                   </Select>
                 </Form.Item>
                 <div style={{ marginTop: -15, marginBottom: 16 }}>
-                  <small style={{ color: '#888' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
+                  <small style={{ color: 'var(--color-text-muted)' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
                 </div>
               </Col>
               <Col span={12}>
@@ -340,7 +340,7 @@ const InvoiceForm = () => {
                 </Form.Item>
                 {fxRates && form.getFieldValue('currency') !== 'TRY' && (
                   <div style={{ marginTop: -15, marginBottom: 16 }}>
-                    <small style={{ color: '#888' }}>
+                    <small style={{ color: 'var(--color-text-muted)' }}>
                       Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
                     </small>
                   </div>
@@ -348,7 +348,7 @@ const InvoiceForm = () => {
               </Col>
             </Row>
 
-            <Divider style={{ background: form.getFieldValue('invoice_type') === 'Alış' ? '#1890ff' : '#52c41a' }} />
+            <Divider style={{ background: form.getFieldValue('invoice_type') === 'Alış' ? 'var(--color-accent)' : 'var(--color-success)' }} />
 
             <Row gutter={16}>
               <Col span={8}>
@@ -367,7 +367,7 @@ const InvoiceForm = () => {
                   />
                 </Form.Item>
                 <div style={{ marginTop: -15, marginBottom: 16 }}>
-                  <small style={{ color: '#888' }}>TL Karşılığı: {tryValues.subtotal.toFixed(2)} TL</small>
+                  <small style={{ color: 'var(--color-text-muted)' }}>TL Karşılığı: {tryValues.subtotal.toFixed(2)} TL</small>
                 </div>
               </Col>
               <Col span={8}>
@@ -392,7 +392,7 @@ const InvoiceForm = () => {
                   </Form.Item>
                 </div>
                 <div style={{ marginTop: -15 }}>
-                  <small style={{ color: '#888' }}>TL Karşılığı: {tryValues.total.toFixed(2)} TL</small>
+                  <small style={{ color: 'var(--color-text-muted)' }}>TL Karşılığı: {tryValues.total.toFixed(2)} TL</small>
                 </div>
               </Col>
               <Col span={8} style={{ textAlign: 'right', marginTop: 30 }}>

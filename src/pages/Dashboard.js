@@ -51,6 +51,19 @@ ChartJS.register(
   ArcElement
 );
 
+// Style guide chart color constants
+const PURCHASE_COLORS = {
+  TRY: '#2563EB',   // Blue
+  USD: '#0891B2',   // Cyan
+  EUR: '#7C3AED',   // Violet
+};
+
+const SALES_COLORS = {
+  TRY: '#16A34A',   // Green
+  USD: '#D97706',   // Amber
+  EUR: '#DC2626',   // Red
+};
+
 const { RangePicker } = DatePicker;
 const { Title: TitleText } = Typography;
 const { Option } = Select;
@@ -184,7 +197,7 @@ const Dashboard = () => {
         datasets: [{
           label: 'KDV',
           data: [0],
-          backgroundColor: 'rgba(200, 200, 200, 0.6)'
+          backgroundColor: '#CBD5E1'
         }]
       };
     }
@@ -215,16 +228,8 @@ const Dashboard = () => {
       const [currency, type] = currencyType.split('-');
       
       // Choose color based on invoice type and currency
-      let backgroundColor;
-      if (type === 'Alış') {
-        backgroundColor = currency === 'TRY' ? 'rgba(54, 162, 235, 0.6)' : 
-                          currency === 'USD' ? 'rgba(75, 192, 192, 0.6)' : 
-                          'rgba(153, 102, 255, 0.6)';
-      } else {
-        backgroundColor = currency === 'TRY' ? 'rgba(255, 99, 132, 0.6)' : 
-                          currency === 'USD' ? 'rgba(255, 206, 86, 0.6)' : 
-                          'rgba(255, 159, 64, 0.6)';
-      }
+      const colorMap = type === 'Alış' ? PURCHASE_COLORS : SALES_COLORS;
+      const backgroundColor = colorMap[currency] || colorMap['TRY'];
       
       datasets.push({
         label: `KDV (${currency} - ${type})`,
@@ -263,8 +268,8 @@ const Dashboard = () => {
         datasets: [{
           label: 'Dağılım',
           data: [1],
-          backgroundColor: ['rgba(200, 200, 200, 0.6)'],
-          borderColor: ['rgba(200, 200, 200, 1)']
+          backgroundColor: ['#CBD5E1'],
+          borderColor: ['#CBD5E1']
         }]
       };
     }
@@ -283,13 +288,10 @@ const Dashboard = () => {
     
     // Process each invoice type
     Object.entries(typeGroups).forEach(([type, items]) => {
-      const backgroundColor = type === 'Alış' ? 
-        ['rgba(54, 162, 235, 0.6)', 'rgba(75, 192, 192, 0.6)', 'rgba(153, 102, 255, 0.6)'] :
-        ['rgba(255, 99, 132, 0.6)', 'rgba(255, 206, 86, 0.6)', 'rgba(255, 159, 64, 0.6)'];
-      
-      const borderColor = type === 'Alış' ?
-        ['rgba(54, 162, 235, 1)', 'rgba(75, 192, 192, 1)', 'rgba(153, 102, 255, 1)'] :
-        ['rgba(255, 99, 132, 1)', 'rgba(255, 206, 86, 1)', 'rgba(255, 159, 64, 1)'];
+      const colors = type === 'Alış' ? PURCHASE_COLORS : SALES_COLORS;
+      const colorValues = Object.values(colors);
+      const backgroundColor = colorValues;
+      const borderColor = colorValues;
       
       datasets.push({
         label: type,
@@ -328,8 +330,8 @@ const Dashboard = () => {
         datasets: [{
           label: 'Toplam',
           data: [0],
-          borderColor: 'rgba(200, 200, 200, 1)',
-          backgroundColor: 'rgba(200, 200, 200, 0.2)',
+          borderColor: '#CBD5E1',
+          backgroundColor: '#E2E8F0',
           tension: 0.4,
         }]
       };
@@ -352,8 +354,8 @@ const Dashboard = () => {
     
     // Create dataset for each invoice type
     Object.entries(typeGroups).forEach(([type, items]) => {
-      const color = type === 'Alış' ? 'rgba(75, 192, 192, 1)' : 'rgba(255, 99, 132, 1)';
-      const backgroundColor = type === 'Alış' ? 'rgba(75, 192, 192, 0.2)' : 'rgba(255, 99, 132, 0.2)';
+      const color = type === 'Alış' ? PURCHASE_COLORS.TRY : SALES_COLORS.TRY;
+      const backgroundColor = type === 'Alış' ? PURCHASE_COLORS.TRY + '33' : SALES_COLORS.TRY + '33';
       
       // Create a map of month to amount for this type
       const monthToAmount = items.reduce((acc, item) => {
@@ -505,51 +507,44 @@ const Dashboard = () => {
       <>
         <Row gutter={16}>
           <Col span={6}>
-            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white' }}>
+            <Card className="dashboard-card kpi-card">
               <Statistic
-                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}</span>}
+                title={type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}
                 value={totals.vatAmount}
                 suffix="TL"
                 precision={2}
-                valueStyle={{ color: 'white' }}
                 prefix={<PercentageOutlined />}
               />
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white' }}>
+            <Card className="dashboard-card kpi-card">
               <Statistic
-                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}</span>}
+                title={type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}
                 value={totals.count}
                 prefix={<FileOutlined />}
-                valueStyle={{ color: 'white' }}
               />
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="dashboard-card" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white' }}>
+            <Card className="dashboard-card kpi-card">
               <Statistic
-                title={<span style={{ color: 'white' }}>{type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}</span>}
+                title={type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}
                 value={totals.total}
                 prefix={<DollarOutlined />}
                 suffix="TL"
                 precision={2}
-                valueStyle={{ color: 'white' }}
               />
             </Card>
           </Col>
           <Col span={6}>
-            <Card className="dashboard-card" style={{ 
-              background: profitLoss >= 0 ? 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' : 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', 
-              color: 'white' 
-            }}>
+            <Card className={`dashboard-card kpi-card ${profitLoss >= 0 ? 'success' : 'danger'}`}>
               <Statistic
-                title={<span style={{ color: 'white' }}>Kar/Zarar (Satış - Alış)</span>}
+                title="Kar/Zarar (Satış - Alış)"
                 value={Math.abs(profitLoss)}
                 prefix={profitLoss >= 0 ? <RiseOutlined /> : <FallOutlined />}
                 suffix="TL"
                 precision={2}
-                valueStyle={{ color: 'white' }}
               />
             </Card>
           </Col>
@@ -567,15 +562,15 @@ const Dashboard = () => {
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           padding: '8px 0', 
-                          borderBottom: index < topCompanies.length - 1 ? '1px solid #f0f0f0' : 'none' 
+                          borderBottom: index < topCompanies.length - 1 ? '1px solid var(--color-border)' : 'none' 
                         }}>
                           <span><strong>{index + 1}.</strong> {company.name}</span>
-                          <span style={{ fontWeight: 'bold', color: '#1890ff' }}>{company.total.toFixed(2)} TL</span>
+                          <span style={{ fontWeight: 'bold', color: 'var(--color-accent)' }}>{company.total.toFixed(2)} TL</span>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Veri yok</div>
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Veri yok</div>
                   )}
                 </Card>
               </Col>
@@ -588,20 +583,20 @@ const Dashboard = () => {
                           display: 'flex', 
                           justifyContent: 'space-between', 
                           padding: '8px 0', 
-                          borderBottom: index < currencyBreakdown.length - 1 ? '1px solid #f0f0f0' : 'none' 
+                          borderBottom: index < currencyBreakdown.length - 1 ? '1px solid var(--color-border)' : 'none' 
                         }}>
                           <span><strong>{item.currency}</strong></span>
                           <div>
-                            <Tag color={item.currency === 'TRY' ? 'blue' : item.currency === 'USD' ? 'green' : 'orange'}>
+                            <Tag style={{ color: 'var(--color-accent)', background: 'var(--color-accent-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 10px', fontSize: 'var(--font-size-xs)' }}>
                               {item.count} adet
                             </Tag>
-                            <span style={{ marginLeft: '8px', color: '#666' }}>{item.total.toFixed(2)} TL</span>
+                            <span style={{ marginLeft: '8px', color: 'var(--color-text-secondary)' }}>{item.total.toFixed(2)} TL</span>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center', padding: '20px', color: '#999' }}>Veri yok</div>
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Veri yok</div>
                   )}
                 </Card>
               </Col>
@@ -769,11 +764,6 @@ const Dashboard = () => {
             size="small"
             onClick={resetFiltersToCurrentMonth}
             title="Filtreleri bu aya sıfırla"
-            style={{ 
-              borderRadius: '6px',
-              backgroundColor: '#f0f0f0',
-              borderColor: '#d9d9d9'
-            }}
           />
         </Col>
       </Row>
