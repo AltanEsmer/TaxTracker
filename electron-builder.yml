@@ -12,7 +12,8 @@ files:
   - "preload.js"
   - "database.js"
   - "package.json"
-  - "!**/node_modules/**/*"
+  - "node_modules/**/*"
+  - "!node_modules/.cache/**/*"
 
 extraMetadata:
   main: "main.js"

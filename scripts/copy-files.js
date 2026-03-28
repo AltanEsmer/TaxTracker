@@ -66,9 +66,15 @@ try {
     fs.copyFileSync(faviconSrc, faviconDest);
     console.log('Copied favicon.ico to build directory');
     
-    // Also copy as icon.ico for electron-builder
-    fs.copyFileSync(faviconSrc, iconDest);
-    console.log('Copied icon.ico to build directory');
+    // Copy root icon.ico for electron-builder (not the tiny favicon)
+    const rootIconSrc = path.join(__dirname, '..', 'icon.ico');
+    if (fs.existsSync(rootIconSrc)) {
+      fs.copyFileSync(rootIconSrc, iconDest);
+      console.log('Copied icon.ico to build directory');
+    } else {
+      fs.copyFileSync(faviconSrc, iconDest);
+      console.log('Copied icon.ico to build directory (from favicon)');
+    }
   }
 } catch (err) {
   console.error('Error handling icons:', err);

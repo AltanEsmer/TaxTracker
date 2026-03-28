@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain, Menu, Tray, dialog } = require('electron');
 const path = require('path');
-const isDev = require('electron-is-dev');
+const isDev = !app.isPackaged;
 const fs = require('fs');
 const DatabaseManager = require('./database');
 const ExcelJS = require('exceljs');
