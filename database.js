@@ -51,6 +51,23 @@ class DatabaseManager {
           }
           return invoice;
         });
+
+        // Migration: fix invoices that used the old 'amount' field instead of 'subtotal'
+        this.invoices = this.invoices.map(invoice => {
+          if (invoice.amount !== undefined && invoice.subtotal === undefined) {
+            const subtotal = invoice.amount;
+            const vatAmount = subtotal * ((invoice.vat_rate || 0) / 100);
+            const total = invoice.total !== undefined ? invoice.total : subtotal + vatAmount;
+            return {
+              ...invoice,
+              subtotal,
+              total,
+              invoice_no: invoice.invoice_no || 'FAT-MIGRATED',
+              amount: undefined
+            };
+          }
+          return invoice;
+        });
         
         this.saveInvoices();
       } else {
@@ -61,6 +78,20 @@ class DatabaseManager {
       if (fs.existsSync(this.fxRatesPath)) {
         const data = fs.readFileSync(this.fxRatesPath, 'utf8');
         this.fxRates = JSON.parse(data);
+
+        // Migration: fix FX rates that used old usd_rate/eur_rate field names
+        this.fxRates = this.fxRates.map(rate => {
+          if (rate.usd_rate !== undefined && rate.usd_to_try === undefined) {
+            return {
+              ...rate,
+              usd_to_try: rate.usd_rate,
+              eur_to_try: rate.eur_rate,
+              usd_rate: undefined,
+              eur_rate: undefined
+            };
+          }
+          return rate;
+        });
       } else {
         this.fxRates = [];
         this.saveFxRates();
@@ -126,30 +157,37 @@ class DatabaseManager {
   
   createSampleData() {
     try {
-      // Create a sample invoice
+      const today = new Date().toISOString().split('T')[0];
+      const subtotal = 1000;
+      const vatRate = 20;
+      const vatAmount = subtotal * (vatRate / 100);
+      const total = subtotal + vatAmount;
+
       const sampleInvoice = {
         id: 1,
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         company: 'Örnek Şirket A.Ş.',
-        amount: 1000,
-        vat_rate: 18,
-        vat_amount: 180,
+        invoice_no: 'FAT-0001',
+        subtotal,
+        vat_rate: vatRate,
+        vat_amount: vatAmount,
+        total,
         currency: 'TRY',
         invoice_type: 'Alış',
-        description: 'Örnek fatura'
+        description: 'Örnek fatura',
+        try_equivalent: { subtotal, vat_amount: vatAmount, total }
       };
       
       this.invoices.push(sampleInvoice);
       this.saveInvoices();
       
-      // Create a sample FX rate
-      const today = new Date();
+      const now = new Date();
       const sampleFxRate = {
         id: 1,
-        year: today.getFullYear(),
-        month: today.getMonth() + 1,
-        usd_rate: 30.5,
-        eur_rate: 33.2
+        year: now.getFullYear(),
+        month: now.getMonth() + 1,
+        usd_to_try: 30.5,
+        eur_to_try: 33.2
       };
       
       this.fxRates.push(sampleFxRate);

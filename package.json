@@ -11,7 +11,7 @@
     "postbuild": "node scripts/copy-files.js",
     "clean": "node scripts/clean.js",
     "prebuild": "npm run clean",
-    "build": "npm run react-build && npm run postbuild && electron-builder --config electron-builder.yml",
+    "build": "node scripts/build.js",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "make-portable": "npm run react-build && npm run postbuild && electron-forge make --targets=@electron-forge/maker-zip"

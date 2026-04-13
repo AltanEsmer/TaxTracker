@@ -13,6 +13,7 @@ files:
   - "preload.js"
   - "database.js"
   - "package.json"
+  - "scripts/**/*"
 
 extraMetadata:
   main: "main.js"

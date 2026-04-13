@@ -320,7 +320,9 @@ ipcMain.handle('delete-fx-rate', async (event, id) => {
 
 ipcMain.handle('show-save-dialog', async (event, options) => {
   try {
-    const result = await dialog.showSaveDialog(mainWindow, options);
+    const targetWindow = mainWindow || BrowserWindow.getFocusedWindow();
+    if (!targetWindow) throw new Error('No window available for save dialog');
+    const result = await dialog.showSaveDialog(targetWindow, options);
     return result.filePath || null;
   } catch (error) {
     console.error('Error in show-save-dialog:', error);

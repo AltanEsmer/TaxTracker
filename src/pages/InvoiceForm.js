@@ -318,7 +318,7 @@ const InvoiceForm = () => {
                     <Option value={0}>0%</Option>
                     <Option value={5}>5%</Option>
                     <Option value={10}>10%</Option>
-                    <Option value={15}>15%</Option>
+                    <Option value={16}>16%</Option>
                     <Option value={20}>20%</Option>
                   </Select>
                 </Form.Item>

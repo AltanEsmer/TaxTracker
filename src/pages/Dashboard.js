@@ -8,7 +8,6 @@ import {
   Typography, 
   Spin, 
   Alert,
-  Select,
   Tabs,
   Tag,
   Button
@@ -66,8 +65,6 @@ const SALES_COLORS = {
 
 const { RangePicker } = DatePicker;
 const { Title: TitleText } = Typography;
-const { Option } = Select;
-const { TabPane } = Tabs;
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
@@ -391,18 +388,6 @@ const Dashboard = () => {
       return sum + vatAmount;
     }, 0);
     return (typeof total === 'number' ? total.toFixed(2) : '0.00');
-  };
-
-  const calculateTotalInvoices = (type = null) => {
-    if (!dashboardData || !dashboardData.rawInvoices) return 0;
-    let filteredData = dashboardData.rawInvoices;
-    if (type) {
-      filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
-    }
-    return filteredData.reduce((sum, item) => {
-      const count = Number(item.try_equivalent?.count || item.count) || 0;
-      return sum + count;
-    }, 0);
   };
 
   const calculateTotalAmount = (type = null) => {
@@ -737,7 +722,7 @@ const Dashboard = () => {
   }
 
   if (loading) {
-    return <Spin size="large" tip="Yükleniyor..." />;
+    return <div style={{ textAlign: 'center', padding: '80px 0' }}><Spin size="large" /></div>;
   }
 
   if (error) {
@@ -780,19 +765,12 @@ const Dashboard = () => {
           setActiveType(newActiveType);
           saveFiltersToStorage(dateRange, newActiveType);
         }}
-      >
-        <TabPane tab="Tümü" key="all">
-          {renderSummaryAndCharts('Tümü')}
-        </TabPane>
-        
-        <TabPane tab="Alış" key="buying">
-          {renderSummaryAndCharts('Alış')}
-        </TabPane>
-        
-        <TabPane tab="Satış" key="selling">
-          {renderSummaryAndCharts('Satış')}
-        </TabPane>
-      </Tabs>
+        items={[
+          { key: 'all',     label: 'Tümü',  children: renderSummaryAndCharts('Tümü') },
+          { key: 'buying',  label: 'Alış',  children: renderSummaryAndCharts('Alış') },
+          { key: 'selling', label: 'Satış', children: renderSummaryAndCharts('Satış') },
+        ]}
+      />
     </div>
   );
 };

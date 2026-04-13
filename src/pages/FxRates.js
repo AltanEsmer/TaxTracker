@@ -34,8 +34,6 @@ const FxRates = () => {
   const [months, setMonths] = useState([]);
   const [usdRates, setUsdRates] = useState({ rate1: 0, rate2: 0, rate3: 0 });
   const [eurRates, setEurRates] = useState({ rate1: 0, rate2: 0, rate3: 0 });
-  const [usdAverage, setUsdAverage] = useState(0);
-  const [eurAverage, setEurAverage] = useState(0);
   
   useEffect(() => {
     if (!window.api) {
@@ -74,7 +72,6 @@ const FxRates = () => {
     const validRates = [rate1, rate2, rate3].filter(r => r && r > 0);
     if (validRates.length === 0) return 0;
     const avg = validRates.reduce((sum, r) => sum + r, 0) / validRates.length;
-    setUsdAverage(avg);
     form.setFieldsValue({ usd_to_try: parseFloat(avg.toFixed(4)) });
     return avg;
   };
@@ -83,7 +80,6 @@ const FxRates = () => {
     const validRates = [rate1, rate2, rate3].filter(r => r && r > 0);
     if (validRates.length === 0) return 0;
     const avg = validRates.reduce((sum, r) => sum + r, 0) / validRates.length;
-    setEurAverage(avg);
     form.setFieldsValue({ eur_to_try: parseFloat(avg.toFixed(4)) });
     return avg;
   };
@@ -128,8 +124,6 @@ const FxRates = () => {
       setEditingId(null);
       setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
       setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
-      setUsdAverage(0);
-      setEurAverage(0);
       
       // Refresh data
       fetchFxRates();
@@ -143,11 +137,9 @@ const FxRates = () => {
   const handleEdit = (record) => {
     setEditingId(record.id);
     form.setFieldsValue(record);
-    // Reset average calculation fields when editing
+    // Reset sub-rate calculation fields when editing
     setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
     setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
-    setUsdAverage(record.usd_to_try || 0);
-    setEurAverage(record.eur_to_try || 0);
   };
 
   const handleCancel = () => {
@@ -155,8 +147,6 @@ const FxRates = () => {
     form.resetFields();
     setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
     setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
-    setUsdAverage(0);
-    setEurAverage(0);
   };
 
   const handleDelete = async (record) => {
@@ -342,8 +332,6 @@ const FxRates = () => {
                       min={0}
                       step={0.0001}
                       precision={4}
-                      readOnly
-                      value={usdAverage}
                     />
                   </Form.Item>
                 </Col>
@@ -398,8 +386,6 @@ const FxRates = () => {
                       min={0}
                       step={0.0001}
                       precision={4}
-                      readOnly
-                      value={eurAverage}
                     />
                   </Form.Item>
                 </Col>
