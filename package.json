@@ -1,6 +1,6 @@
 {
   "name": "tax-tracker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Fatura Kayıt ve KDV Takip Uygulaması",
   "main": "main.js",
   "scripts": {
@@ -44,6 +44,8 @@
     "wait-on": "^7.0.1"
   },
   "dependencies": {
+    "electron-log": "^5.2.0",
+    "electron-updater": "^6.3.9",
     "exceljs": "^4.4.0"
   },
   "browserslist": {
