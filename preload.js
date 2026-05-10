@@ -26,6 +26,15 @@ contextBridge.exposeInMainWorld(
     showSaveDialog: (options) => ipcRenderer.invoke('show-save-dialog', options),
 
     // Excel export (main process)
-    exportToExcel: (data, filePath) => ipcRenderer.invoke('export-to-excel', data, filePath)
+    exportToExcel: (data, filePath) => ipcRenderer.invoke('export-to-excel', data, filePath),
+
+    // KDV rate operations
+    getKdvRates: () => ipcRenderer.invoke('get-kdv-rates'),
+    addKdvRate: (rate) => ipcRenderer.invoke('add-kdv-rate', rate),
+    updateKdvRate: (id, rate) => ipcRenderer.invoke('update-kdv-rate', id, rate),
+    deleteKdvRate: (id) => ipcRenderer.invoke('delete-kdv-rate', id),
+
+    // Auto-updater
+    checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   }
 );

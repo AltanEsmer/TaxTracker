@@ -30,10 +30,12 @@ class DatabaseManager {
     
     this.invoicesPath = path.join(this.dbPath, 'invoices.json');
     this.fxRatesPath = path.join(this.dbPath, 'fxrates.json');
-    
+    this.kdvRatesPath = path.join(this.dbPath, 'kdv-rates.json');
+
     this.invoices = [];
     this.fxRates = [];
-    
+    this.kdvRates = [];
+
     // Load data if exists
     this.loadData();
   }
@@ -96,10 +98,26 @@ class DatabaseManager {
         this.fxRates = [];
         this.saveFxRates();
       }
+
+      if (fs.existsSync(this.kdvRatesPath)) {
+        const data = fs.readFileSync(this.kdvRatesPath, 'utf8');
+        this.kdvRates = JSON.parse(data);
+      } else {
+        // Seed Turkish standard KDV rates so existing users see no UI change
+        this.kdvRates = [
+          { id: 1, rate: 0,  label: '' },
+          { id: 2, rate: 5,  label: '' },
+          { id: 3, rate: 10, label: '' },
+          { id: 4, rate: 16, label: '' },
+          { id: 5, rate: 20, label: '' },
+        ];
+        this.saveKdvRates();
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       this.invoices = [];
       this.fxRates = [];
+      this.kdvRates = [];
     }
   }
   
@@ -126,6 +144,14 @@ class DatabaseManager {
       this._atomicWrite(this.fxRatesPath, this.fxRates);
     } catch (error) {
       console.error('Error saving FX rates:', error);
+    }
+  }
+
+  saveKdvRates() {
+    try {
+      this._atomicWrite(this.kdvRatesPath, this.kdvRates);
+    } catch (error) {
+      console.error('Error saving KDV rates:', error);
     }
   }
 
@@ -238,6 +264,15 @@ class DatabaseManager {
     }
     if (!isFinite(fxRate.eur_to_try) || fxRate.eur_to_try < 0) {
       throw new Error('FX rate eur_to_try must be a finite number >= 0');
+    }
+  }
+
+  _validateKdvRate(kdvRate) {
+    if (!isFinite(kdvRate.rate) || kdvRate.rate < 0 || kdvRate.rate > 100) {
+      throw new Error('KDV rate must be a finite number between 0 and 100');
+    }
+    if (kdvRate.label !== undefined && kdvRate.label !== null && typeof kdvRate.label !== 'string') {
+      throw new Error('KDV rate label must be a string');
     }
   }
 
@@ -490,6 +525,67 @@ class DatabaseManager {
       }
     } catch (error) {
       console.error('Error deleting FX rate:', error);
+      throw error;
+    }
+  }
+
+  // KDV rate operations
+  getKdvRates() {
+    try {
+      return [...this.kdvRates].sort((a, b) => a.rate - b.rate);
+    } catch (error) {
+      console.error('Error getting KDV rates:', error);
+      throw error;
+    }
+  }
+
+  addKdvRate(kdvRate) {
+    try {
+      this._validateKdvRate(kdvRate);
+      // Reject duplicates by rate value
+      if (this.kdvRates.some(r => r.rate === kdvRate.rate)) {
+        throw new Error(`KDV oranı %${kdvRate.rate} zaten mevcut`);
+      }
+      const id = this.kdvRates.length > 0
+        ? Math.max(...this.kdvRates.map(r => r.id)) + 1
+        : 1;
+      const newRate = { id, rate: kdvRate.rate, label: kdvRate.label || '' };
+      this.kdvRates.push(newRate);
+      this.saveKdvRates();
+      return newRate;
+    } catch (error) {
+      console.error('Error adding KDV rate:', error);
+      throw error;
+    }
+  }
+
+  updateKdvRate(id, kdvRate) {
+    try {
+      this._validateKdvRate(kdvRate);
+      const index = this.kdvRates.findIndex(r => r.id === Number(id));
+      if (index === -1) throw new Error(`KDV rate with ID ${id} not found`);
+      // Reject if updating to a rate value that already exists on a different row
+      if (this.kdvRates.some(r => r.rate === kdvRate.rate && r.id !== Number(id))) {
+        throw new Error(`KDV oranı %${kdvRate.rate} zaten mevcut`);
+      }
+      this.kdvRates[index] = { id: Number(id), rate: kdvRate.rate, label: kdvRate.label || '' };
+      this.saveKdvRates();
+      return this.kdvRates[index];
+    } catch (error) {
+      console.error('Error updating KDV rate:', error);
+      throw error;
+    }
+  }
+
+  deleteKdvRate(id) {
+    try {
+      const index = this.kdvRates.findIndex(r => r.id === Number(id));
+      if (index === -1) throw new Error(`KDV rate with ID ${id} not found`);
+      this.kdvRates.splice(index, 1);
+      this.saveKdvRates();
+      return { id: Number(id) };
+    } catch (error) {
+      console.error('Error deleting KDV rate:', error);
       throw error;
     }
   }

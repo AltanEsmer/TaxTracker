@@ -31,6 +31,7 @@ const InvoiceForm = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentInvoice, setCurrentInvoice] = useState(null);
   const [fxRates, setFxRates] = useState(null);
+  const [kdvRates, setKdvRates] = useState([]);
   const [manualTotal, setManualTotal] = useState(false);
   const [tryValues, setTryValues] = useState({
     subtotal: 0,
@@ -47,6 +48,7 @@ const InvoiceForm = () => {
       setLoading(false);
       return;
     }
+    fetchKdvRates();
     if (id) {
       setIsEditing(true);
       fetchInvoice(id);
@@ -55,6 +57,15 @@ const InvoiceForm = () => {
       fetchFxRatesForDate(dayjs());
     }
   }, [id]);
+
+  const fetchKdvRates = async () => {
+    try {
+      const data = await window.api.getKdvRates();
+      setKdvRates(data || []);
+    } catch (error) {
+      message.error(error.message || 'KDV oranları yüklenirken bir hata oluştu.');
+    }
+  };
 
   const fetchFxRatesForDate = async (date) => {
     try {
@@ -314,12 +325,25 @@ const InvoiceForm = () => {
                   label="KDV Oranı (%)"
                   rules={[{ required: true, message: 'Lütfen KDV oranı girin' }]}
                 >
-                  <Select onChange={calculateTotal}>
-                    <Option value={0}>0%</Option>
-                    <Option value={5}>5%</Option>
-                    <Option value={10}>10%</Option>
-                    <Option value={16}>16%</Option>
-                    <Option value={20}>20%</Option>
+                  <Select onChange={calculateTotal} placeholder="KDV oranı seçin">
+                    {(() => {
+                      const currentVal = form.getFieldValue('vat_rate');
+                      const inList = currentVal !== undefined && currentVal !== null
+                        && kdvRates.some(r => r.rate === currentVal);
+                      const showTransient = currentVal !== undefined && currentVal !== null && !inList;
+                      return (
+                        <>
+                          {showTransient && (
+                            <Option key={`t-${currentVal}`} value={currentVal}>{currentVal}% (eski)</Option>
+                          )}
+                          {kdvRates.map(r => (
+                            <Option key={r.id} value={r.rate}>
+                              {r.rate}%{r.label ? ` — ${r.label}` : ''}
+                            </Option>
+                          ))}
+                        </>
+                      );
+                    })()}
                   </Select>
                 </Form.Item>
                 <div style={{ marginTop: -15, marginBottom: 16 }}>

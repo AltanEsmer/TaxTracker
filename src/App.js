@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Layout, Menu, ConfigProvider, Button } from 'antd';
-import { HomeOutlined, FileAddOutlined, DollarOutlined, BulbOutlined, BulbFilled } from '@ant-design/icons';
+import { HomeOutlined, FileAddOutlined, DollarOutlined, BulbOutlined, BulbFilled, SettingOutlined } from '@ant-design/icons';
 import Dashboard from './pages/Dashboard';
 import InvoiceList from './pages/InvoiceList';
 import InvoiceForm from './pages/InvoiceForm';
 import FxRates from './pages/FxRates';
+import KdvSettings from './pages/KdvSettings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const { Content, Sider } = Layout;
@@ -16,6 +17,7 @@ const getSelectedKey = (pathname) => {
   if (pathname === '/invoices/new') return '3';
   if (pathname.startsWith('/invoices/edit')) return '2';
   if (pathname === '/fx-rates') return '4';
+  if (pathname === '/kdv-rates') return '5';
   return '1';
 };
 
@@ -157,6 +159,7 @@ function App() {
               { key: '2', icon: <FileAddOutlined />, label: <Link to="/invoices">Faturalar</Link> },
               { key: '3', icon: <FileAddOutlined />, label: <Link to="/invoices/new">Yeni Fatura</Link> },
               { key: '4', icon: <DollarOutlined />, label: <Link to="/fx-rates">Kur Yönetimi</Link> },
+              { key: '5', icon: <SettingOutlined />, label: <Link to="/kdv-rates">KDV Oranları</Link> },
             ]}
           />
           <div style={{ position: 'absolute', bottom: '48px', width: '100%', textAlign: 'center', padding: '16px 0' }}>
@@ -180,6 +183,7 @@ function App() {
                   <Route path="/invoices/new" element={<InvoiceForm />} />
                   <Route path="/invoices/edit/:id" element={<InvoiceForm />} />
                   <Route path="/fx-rates" element={<FxRates />} />
+                  <Route path="/kdv-rates" element={<KdvSettings />} />
                 </Routes>
               </ErrorBoundary>
             </div>
