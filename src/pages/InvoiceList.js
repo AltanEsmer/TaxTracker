@@ -100,31 +100,36 @@ const InvoiceList = () => {
       if (!filePath) return;
 
       const exportData = filteredRows.map((invoice) => {
-        const vatAmount = invoice.subtotal * (invoice.vat_rate / 100);
-        let trySubtotal = 0, tryVatAmount = 0, tryTotal = 0;
-        if (invoice.try_equivalent && invoice.try_equivalent.total) {
-          trySubtotal = invoice.try_equivalent.subtotal || 0;
-          tryVatAmount = invoice.try_equivalent.vat_amount || 0;
-          tryTotal = invoice.try_equivalent.total || 0;
-        } else if (invoice.currency === 'TRY') {
-          trySubtotal = invoice.subtotal;
-          tryVatAmount = vatAmount;
-          tryTotal = invoice.total;
-        }
+        const subtotal = Number(invoice.subtotal) || 0;
+        const vatAmount = Number(invoice.vat_amount) || 0;
+        const total = Number(invoice.total) || 0;
         const hasTryEquivalent = invoice.try_equivalent && invoice.try_equivalent.total;
+        const trySubtotal = hasTryEquivalent
+          ? Number(invoice.try_equivalent.subtotal) || 0
+          : invoice.currency === 'TRY' ? subtotal : null;
+        const tryVatAmount = hasTryEquivalent
+          ? Number(invoice.try_equivalent.vat_amount) || 0
+          : invoice.currency === 'TRY' ? vatAmount : null;
+        const tryTotal = hasTryEquivalent
+          ? Number(invoice.try_equivalent.total) || 0
+          : invoice.currency === 'TRY' ? total : null;
+        // KDV Oranı is either a numeric percentage or the string "Karışık" for mixed-rate invoices.
+        const vatRateCell = invoice.vat_rate == null
+          ? 'Karışık'
+          : Number(invoice.vat_rate).toFixed(2);
         return {
           'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
           'Fatura Tip': invoice.invoice_type || 'Alış',
           'Şirket': invoice.company,
           'Fatura No': invoice.invoice_no,
           'Para Birim': invoice.currency,
-          'Ara Toplam': typeof invoice.subtotal === 'number' ? invoice.subtotal.toFixed(2) : invoice.subtotal,
-          'KDV Oranı': typeof invoice.vat_rate === 'number' ? invoice.vat_rate.toFixed(2) : invoice.vat_rate,
-          'KDV Tutar': typeof vatAmount === 'number' ? vatAmount.toFixed(2) : vatAmount,
-          'Genel Toplam': typeof invoice.total === 'number' ? invoice.total.toFixed(2) : invoice.total,
-          'Ara Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof trySubtotal === 'number' ? trySubtotal.toFixed(2) : trySubtotal) : 'KUR EKSIK',
-          'KDV Tutar (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryVatAmount === 'number' ? tryVatAmount.toFixed(2) : tryVatAmount) : 'KUR EKSIK',
-          'Genel Toplam (TL)': hasTryEquivalent || invoice.currency === 'TRY' ? (typeof tryTotal === 'number' ? tryTotal.toFixed(2) : tryTotal) : 'KUR EKSIK',
+          'Ara Toplam': subtotal.toFixed(2),
+          'KDV Oranı': vatRateCell,
+          'KDV Tutar': vatAmount.toFixed(2),
+          'Genel Toplam': total.toFixed(2),
+          'Ara Toplam (TL)': trySubtotal != null ? trySubtotal.toFixed(2) : 'KUR EKSIK',
+          'KDV Tutar (TL)': tryVatAmount != null ? tryVatAmount.toFixed(2) : 'KUR EKSIK',
+          'Genel Toplam (TL)': tryTotal != null ? tryTotal.toFixed(2) : 'KUR EKSIK',
         };
       });
 
@@ -142,7 +147,53 @@ const InvoiceList = () => {
         { wch: 16 }, { wch: 16 }, { wch: 16 },
       ];
 
-      await window.api.exportToExcel({ rows: exportData, totalRow, colWidths, sheetName: 'Faturalar' }, filePath);
+      // Build a flat per-line-item sheet so accountants can audit the KDV breakdown
+      // even when invoices carry mixed rates.
+      const lineItems = [];
+      for (const invoice of filteredRows) {
+        const lines = Array.isArray(invoice.line_items) ? invoice.line_items : [];
+        const tryLines = Array.isArray(invoice.try_equivalent?.line_items)
+          ? invoice.try_equivalent.line_items
+          : [];
+        for (let idx = 0; idx < lines.length; idx += 1) {
+          const li = lines[idx];
+          const liSubtotal = Number(li.subtotal) || 0;
+          const liRate = Number(li.vat_rate) || 0;
+          const liVat = liSubtotal * (liRate / 100);
+          const liTotal = liSubtotal + liVat;
+          const tryLi = tryLines.find((t) => t.id === li.id) || tryLines[idx] || null;
+          lineItems.push({
+            'Tarih': dayjs(invoice.date).format('DD/MM/YYYY'),
+            'Fatura No': invoice.invoice_no,
+            'Şirket': invoice.company,
+            'Fatura Tip': invoice.invoice_type || 'Alış',
+            'Para Birim': invoice.currency,
+            'Satır Açıklama': li.description || '',
+            'Ara Toplam': liSubtotal.toFixed(2),
+            'KDV Oranı': liRate.toFixed(2),
+            'KDV Tutar': liVat.toFixed(2),
+            'Satır Toplamı': liTotal.toFixed(2),
+            'Ara Toplam (TL)': tryLi ? (Number(tryLi.subtotal) || 0).toFixed(2) : (invoice.currency === 'TRY' ? liSubtotal.toFixed(2) : 'KUR EKSIK'),
+            'KDV Tutar (TL)': tryLi ? (Number(tryLi.vat_amount) || 0).toFixed(2) : (invoice.currency === 'TRY' ? liVat.toFixed(2) : 'KUR EKSIK'),
+          });
+        }
+      }
+
+      const lineItemsColWidths = [
+        { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 10 }, { wch: 10 },
+        { wch: 28 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 14 },
+        { wch: 16 }, { wch: 16 },
+      ];
+
+      await window.api.exportToExcel({
+        rows: exportData,
+        totalRow,
+        colWidths,
+        sheetName: 'Faturalar',
+        lineItems,
+        lineItemsSheetName: 'Kalemler',
+        lineItemsColWidths,
+      }, filePath);
       message.success(`Faturalar başarıyla aktarıldı. (${exportData.length} satır)`);
     } catch (error) {
       message.error('Excel dosyası oluşturulurken bir hata oluştu: ' + error.message);

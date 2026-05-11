@@ -1,4 +1,4 @@
-// InvoiceForm — Quiet Premium redesign (Slice 3)
+// InvoiceForm — Quiet Premium redesign with multi-line KDV support.
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { Input, DatePicker, Segmented, Button, Spin, message } from 'antd';
 import { SaveOutlined, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
@@ -6,11 +6,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import 'dayjs/locale/tr';
 import InvoiceFormMoneyZone from '../components/InvoiceFormMoneyZone';
+import InvoiceFormLineItems, { computeInvoiceTotals } from '../components/InvoiceFormLineItems';
 import { TopBarContext } from '../App';
 
 dayjs.locale('tr');
 
 const { TextArea } = Input;
+
+const defaultLineItem = () => ({
+  id: 1,
+  description: '',
+  subtotal: 0,
+  vat_rate: 20,
+  vat_amount: 0,
+});
 
 const InvoiceForm = () => {
   const { id } = useParams();
@@ -23,10 +32,9 @@ const InvoiceForm = () => {
   const [invoiceType, setInvoiceType] = useState('Alış');
   const [description, setDescription] = useState('');
   const [currency, setCurrency] = useState('TRY');
-  const [subtotal, setSubtotal] = useState(0);
-  const [vatRate, setVatRate] = useState(20);
-  const [total, setTotal] = useState(0);
+  const [lineItems, setLineItems] = useState([defaultLineItem()]);
   const [manualTotal, setManualTotal] = useState(false);
+  const [manualTotalValue, setManualTotalValue] = useState(0);
   const [fxRate, setFxRate] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
@@ -40,7 +48,24 @@ const InvoiceForm = () => {
       .catch(() => {});
   }, []);
 
-  // Merged + sorted vatOptions (default rates + custom rates)
+  // Aggregate totals derived live from line items
+  const totals = useMemo(() => computeInvoiceTotals(lineItems), [lineItems]);
+  const manualTotalAllowed = lineItems.length === 1;
+
+  // If line count changes such that manual override is no longer allowed, disable it.
+  useEffect(() => {
+    if (!manualTotalAllowed && manualTotal) {
+      setManualTotal(false);
+    }
+  }, [manualTotalAllowed, manualTotal]);
+
+  // Keep manualTotalValue tracking the computed total when manual override is off,
+  // so toggling the switch starts from the current computed value.
+  useEffect(() => {
+    if (!manualTotal) setManualTotalValue(totals.total);
+  }, [totals.total, manualTotal]);
+
+  // Merge default KDV rates with the user's custom rates and any rates present in current lines.
   const vatOptions = useMemo(() => {
     const map = new Map();
     [0, 5, 10, 16, 20].forEach(r => map.set(r, { rate: r }));
@@ -48,16 +73,12 @@ const InvoiceForm = () => {
       const rateNum = Number(r.rate);
       if (Number.isFinite(rateNum)) map.set(rateNum, { rate: rateNum, label: r.label });
     });
-    if (vatRate != null && !map.has(Number(vatRate))) {
-      map.set(Number(vatRate), { rate: Number(vatRate) });
-    }
+    lineItems.forEach(li => {
+      const rateNum = Number(li.vat_rate);
+      if (Number.isFinite(rateNum) && !map.has(rateNum)) map.set(rateNum, { rate: rateNum });
+    });
     return [...map.values()].sort((a, b) => a.rate - b.rate);
-  }, [customKdvRates, vatRate]);
-
-  // Auto-compute total unless manual override
-  useEffect(() => {
-    if (!manualTotal) setTotal(Number(subtotal) * (1 + Number(vatRate) / 100));
-  }, [subtotal, vatRate, manualTotal]);
+  }, [customKdvRates, lineItems]);
 
   // Look up FX rate when date or currency changes
   useEffect(() => {
@@ -85,18 +106,54 @@ const InvoiceForm = () => {
       setInvoiceType(inv.invoice_type || 'Alış');
       setDescription(inv.description || '');
       setCurrency(inv.currency);
-      setSubtotal(Number(inv.subtotal));
-      setVatRate(Number(inv.vat_rate));
-      setTotal(Number(inv.total));
-      const computed = Number(inv.subtotal) * (1 + Number(inv.vat_rate) / 100);
-      if (Math.abs(Number(inv.total) - computed) > 0.01) setManualTotal(true);
+
+      // Prefer stored line_items (post-migration these always exist). Fall back to a synthesized
+      // single line for any legacy record that somehow slipped through.
+      const storedLines = Array.isArray(inv.line_items) && inv.line_items.length > 0
+        ? inv.line_items.map((li, idx) => ({
+            id: Number.isFinite(li.id) ? li.id : idx + 1,
+            description: li.description || '',
+            subtotal: Number(li.subtotal) || 0,
+            vat_rate: Number(li.vat_rate) || 0,
+            vat_amount: Number(li.vat_amount) || 0,
+          }))
+        : [{
+            id: 1,
+            description: inv.description || '',
+            subtotal: Number(inv.subtotal) || 0,
+            vat_rate: Number(inv.vat_rate) || 0,
+            vat_amount: (Number(inv.subtotal) || 0) * ((Number(inv.vat_rate) || 0) / 100),
+          }];
+      setLineItems(storedLines);
+
+      // Detect manual total override (only possible for single-line invoices)
+      const computedTotal = storedLines.reduce(
+        (acc, li) => acc + (li.subtotal + li.subtotal * (li.vat_rate / 100)),
+        0,
+      );
+      const storedTotal = Number(inv.total) || 0;
+      if (storedLines.length === 1 && Math.abs(storedTotal - computedTotal) > 0.01) {
+        setManualTotal(true);
+        setManualTotalValue(storedTotal);
+      } else {
+        setManualTotal(false);
+        setManualTotalValue(storedTotal);
+      }
     }).catch(() => {
       message.error('Fatura yüklenirken bir hata oluştu');
       navigate('/invoices');
     }).finally(() => setLoading(false));
   }, [id, isEditMode, navigate]);
 
-  const validationOk = company && invoiceNo && date && invoiceType && currency && subtotal > 0 && total > 0;
+  const hasValidLines = lineItems.some(li => Number(li.subtotal) > 0);
+  const validationOk =
+    company.trim() &&
+    invoiceNo.trim() &&
+    date &&
+    invoiceType &&
+    currency &&
+    hasValidLines &&
+    totals.total > 0;
 
   const handleSave = async (createAnother) => {
     if (!validationOk) { message.warning('Lütfen tüm zorunlu alanları doldurun'); return; }
@@ -106,7 +163,9 @@ const InvoiceForm = () => {
       return;
     }
     setSaving(true);
-    const vatAmount = Number(total) - Number(subtotal);
+
+    const effectiveTotal = manualTotal && manualTotalAllowed ? Number(manualTotalValue) : totals.total;
+
     const payload = {
       company: company.trim(),
       invoice_no: invoiceNo.trim(),
@@ -114,10 +173,17 @@ const InvoiceForm = () => {
       invoice_type: invoiceType,
       description: description.trim(),
       currency,
-      subtotal: Number(subtotal),
-      vat_rate: Number(vatRate),
-      vat_amount: vatAmount,
-      total: Number(total),
+      line_items: lineItems.map((li) => ({
+        id: li.id,
+        description: (li.description || '').trim(),
+        subtotal: Number(li.subtotal) || 0,
+        vat_rate: Number(li.vat_rate) || 0,
+        vat_amount: (Number(li.subtotal) || 0) * ((Number(li.vat_rate) || 0) / 100),
+      })),
+      subtotal: totals.subtotal,
+      vat_rate: totals.vat_rate,
+      vat_amount: totals.vat_amount,
+      total: effectiveTotal,
     };
     try {
       if (isEditMode) {
@@ -131,9 +197,9 @@ const InvoiceForm = () => {
           setCompany('');
           setInvoiceNo('');
           setDescription('');
-          setSubtotal(0);
-          setTotal(0);
+          setLineItems([defaultLineItem()]);
           setManualTotal(false);
+          setManualTotalValue(0);
         } else {
           navigate('/invoices');
         }
@@ -225,22 +291,29 @@ const InvoiceForm = () => {
           </div>
         </div>
 
-        {/* RIGHT: money zone */}
+        {/* RIGHT: currency + total + FX */}
         <InvoiceFormMoneyZone
           currency={currency}
           onCurrencyChange={setCurrency}
-          subtotal={subtotal}
-          onSubtotalChange={setSubtotal}
-          vatRate={vatRate}
-          onVatRateChange={setVatRate}
+          computedTotal={totals.total}
           fxRate={fxRate}
           fxPeriodLabel={date ? dayjs(date).format('MMMM YYYY') : ''}
           manualTotal={manualTotal}
-          manualTotalValue={total}
-          onManualTotalChange={setTotal}
+          manualTotalValue={manualTotalValue}
+          onManualTotalChange={setManualTotalValue}
           onManualToggle={setManualTotal}
-          vatOptions={vatOptions}
+          manualTotalAllowed={manualTotalAllowed}
           fxMissing={currency !== 'TRY' && (!fxRate || fxRate <= 0)}
+        />
+      </div>
+
+      {/* Line items section (full width below the grid) */}
+      <div className="card form-card" style={{ marginTop: 20 }}>
+        <InvoiceFormLineItems
+          value={lineItems}
+          onChange={setLineItems}
+          vatOptions={vatOptions}
+          currency={currency}
         />
       </div>
 
