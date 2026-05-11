@@ -1,418 +1,238 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Form, 
-  Input, 
-  Button, 
-  DatePicker, 
-  Select, 
-  InputNumber, 
-  Typography, 
-  Row, 
-  Col, 
-  Card, 
-  message, 
-  Spin,
-  Divider,
-  Switch
-} from 'antd';
-import { 
-  SaveOutlined, 
-  ArrowLeftOutlined 
-} from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+// InvoiceForm — Quiet Premium redesign (Slice 3)
+import { useContext, useEffect, useState } from 'react';
+import { Input, DatePicker, Segmented, Button, Spin, message } from 'antd';
+import { SaveOutlined, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { useNavigate, useParams } from 'react-router-dom';
 import dayjs from 'dayjs';
+import 'dayjs/locale/tr';
+import InvoiceFormMoneyZone from '../components/InvoiceFormMoneyZone';
+import { TopBarContext } from '../App';
 
-const { Title } = Typography;
-const { Option } = Select;
+const { TextArea } = Input;
 
 const InvoiceForm = () => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [currentInvoice, setCurrentInvoice] = useState(null);
-  const [fxRates, setFxRates] = useState(null);
-  const [manualTotal, setManualTotal] = useState(false);
-  const [tryValues, setTryValues] = useState({
-    subtotal: 0,
-    vatAmount: 0,
-    total: 0
-  });
-  
   const { id } = useParams();
+  const isEditMode = !!id;
   const navigate = useNavigate();
 
+  const [company, setCompany] = useState('');
+  const [invoiceNo, setInvoiceNo] = useState('');
+  const [date, setDate] = useState(dayjs());
+  const [invoiceType, setInvoiceType] = useState('Alış');
+  const [description, setDescription] = useState('');
+  const [currency, setCurrency] = useState('TRY');
+  const [subtotal, setSubtotal] = useState(0);
+  const [vatRate, setVatRate] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [manualTotal, setManualTotal] = useState(false);
+  const [fxRate, setFxRate] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(isEditMode);
+
+  // Auto-compute total unless manual override
   useEffect(() => {
-    if (!window.api) {
-      message.error('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
-      setLoading(false);
-      return;
-    }
-    if (id) {
-      setIsEditing(true);
-      fetchInvoice(id);
-    } else {
-      // Fetch current month's FX rates for new invoices
-      fetchFxRatesForDate(dayjs());
-    }
-  }, [id]);
+    if (!manualTotal) setTotal(Number(subtotal) * (1 + Number(vatRate) / 100));
+  }, [subtotal, vatRate, manualTotal]);
 
-  const fetchFxRatesForDate = async (date) => {
-    try {
-      const selectedDate = date ? date.toDate() : new Date();
-      const year = selectedDate.getFullYear();
-      const month = selectedDate.getMonth() + 1;
-      
-      const rates = await window.api.getFxRates(year, month);
-      
-      if (rates && rates.length > 0) {
-        setFxRates(rates[0]);
-        // Recalculate TRY values with the new rate
-        const subtotal = form.getFieldValue('subtotal') || 0;
-        const vatRate = form.getFieldValue('vat_rate') || 0;
-        const total = form.getFieldValue('total') || 0;
-        const currency = form.getFieldValue('currency');
-        updateTryValues(subtotal, vatRate, total, currency);
-      } else {
-        setFxRates(null);
-        message.warning(`${year} yılı ${month}. ay için kur bilgisi bulunamadı. Lütfen Kur Yönetimi sayfasından ekleyin.`);
-      }
-    } catch (error) {
-      // silenced — user-facing warning shown above if rates missing
-    }
-  };
+  // Look up FX rate when date or currency changes
+  useEffect(() => {
+    if (currency === 'TRY' || !date) { setFxRate(null); return; }
+    if (!window.api) return;
+    const year = date.year();
+    const month = date.month() + 1;
+    window.api.getFxRates(year, month).then((rates) => {
+      const row = Array.isArray(rates) ? rates[0] : rates;
+      if (row) setFxRate(currency === 'USD' ? row.usd_to_try : row.eur_to_try);
+      else setFxRate(null);
+    }).catch(() => setFxRate(null));
+  }, [currency, date]);
 
-  const fetchInvoice = async (invoiceId) => {
-    try {
-      setLoading(true);
-      const invoice = await window.api.getInvoiceById(parseInt(invoiceId));
-      
-      if (invoice) {
-        setCurrentInvoice(invoice);
-        const invoiceDate = dayjs(invoice.date);
-        form.setFieldsValue({
-          ...invoice,
-          date: invoiceDate
-        });
-        // Fetch FX rates for the invoice date
-        await fetchFxRatesForDate(invoiceDate);
-        updateTryValues(invoice.subtotal, invoice.vat_rate, invoice.total, invoice.currency);
-      } else {
-        message.error('Fatura bulunamadı.');
-        navigate('/invoices');
-      }
-    } catch (error) {
-      message.error('Fatura yüklenirken bir hata oluştu.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSubmit = async (values) => {
-    try {
-      setLoading(true);
-      
-      // Format the date
-      const formattedValues = {
-        ...values,
-        date: values.date.format('YYYY-MM-DD'),
-        try_equivalent: {
-          subtotal: tryValues.subtotal,
-          vat_amount: tryValues.vatAmount,
-          total: tryValues.total
-        }
-      };
-      
-      if (isEditing) {
-        await window.api.updateInvoice(parseInt(id), formattedValues);
-        message.success('Fatura başarıyla güncellendi.');
-      } else {
-        await window.api.addInvoice(formattedValues);
-        message.success('Fatura başarıyla eklendi.');
-      }
-      
+  // Edit mode: load existing invoice
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (!window.api) { message.error('window.api bulunamadı'); return; }
+    setLoading(true);
+    window.api.getInvoiceById(parseInt(id, 10)).then((inv) => {
+      if (!inv) { message.error('Fatura bulunamadı'); navigate('/invoices'); return; }
+      setCompany(inv.company);
+      setInvoiceNo(inv.invoice_no);
+      setDate(dayjs(inv.date));
+      setInvoiceType(inv.invoice_type || 'Alış');
+      setDescription(inv.description || '');
+      setCurrency(inv.currency);
+      setSubtotal(Number(inv.subtotal));
+      setVatRate(Number(inv.vat_rate));
+      setTotal(Number(inv.total));
+      const computed = Number(inv.subtotal) * (1 + Number(inv.vat_rate) / 100);
+      if (Math.abs(Number(inv.total) - computed) > 0.01) setManualTotal(true);
+    }).catch(() => {
+      message.error('Fatura yüklenirken bir hata oluştu');
       navigate('/invoices');
-    } catch (error) {
-      message.error('Fatura kaydedilirken bir hata oluştu.');
+    }).finally(() => setLoading(false));
+  }, [id, isEditMode, navigate]);
+
+  const validationOk = company && invoiceNo && date && invoiceType && currency && subtotal > 0 && total > 0;
+
+  const handleSave = async (createAnother) => {
+    if (!validationOk) { message.warning('Lütfen tüm zorunlu alanları doldurun'); return; }
+    if (!window.api) { message.error('window.api bulunamadı'); return; }
+    setSaving(true);
+    const vatAmount = Number(total) - Number(subtotal);
+    const payload = {
+      company: company.trim(),
+      invoice_no: invoiceNo.trim(),
+      date: date.format('YYYY-MM-DD'),
+      invoice_type: invoiceType,
+      description: description.trim(),
+      currency,
+      subtotal: Number(subtotal),
+      vat_rate: Number(vatRate),
+      vat_amount: vatAmount,
+      total: Number(total),
+    };
+    try {
+      if (isEditMode) {
+        await window.api.updateInvoice(parseInt(id, 10), payload);
+        message.success('Fatura güncellendi');
+        navigate('/invoices');
+      } else {
+        await window.api.addInvoice(payload);
+        message.success('Fatura eklendi');
+        if (createAnother) {
+          setCompany('');
+          setInvoiceNo('');
+          setDescription('');
+          setSubtotal(0);
+          setTotal(0);
+          setManualTotal(false);
+        } else {
+          navigate('/invoices');
+        }
+      }
+    } catch (e) {
+      message.error(`Kayıt başarısız: ${e?.message || 'bilinmeyen hata'}`);
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const calculateTotal = () => {
-    if (manualTotal) return;
-    
-    const subtotal = form.getFieldValue('subtotal') || 0;
-    const vatRate = form.getFieldValue('vat_rate') || 0;
-    
-    const vatAmount = subtotal * (vatRate / 100);
-    const total = subtotal + vatAmount;
-    
-    form.setFieldsValue({ total });
-    
-    // Update TRY values
-    updateTryValues(subtotal, vatRate, total, form.getFieldValue('currency'));
-    
-    return total;
-  };
-
-  const updateTryValues = (subtotal, vatRate, total, currency) => {
-    if (!fxRates || !currency) return;
-    
-    let rate = 1;
-    if (currency === 'USD' && fxRates.usd_to_try) {
-      rate = parseFloat(fxRates.usd_to_try);
-    } else if (currency === 'EUR' && fxRates.eur_to_try) {
-      rate = parseFloat(fxRates.eur_to_try);
-    }
-    
-    const trySubtotal = subtotal * rate;
-    const tryVatAmount = (subtotal * (vatRate / 100)) * rate;
-    const tryTotal = total * rate;
-    
-    setTryValues({
-      subtotal: trySubtotal,
-      vatAmount: tryVatAmount,
-      total: tryTotal
-    });
-  };
-
-  const handleTotalChange = (value) => {
-    if (!manualTotal) return;
-    
-    // When manually changing total, calculate subtotal based on the VAT rate
-    const vatRate = form.getFieldValue('vat_rate') || 0;
-    const total = value || 0;
-    
-    // Calculate subtotal: total / (1 + vatRate/100)
-    const subtotal = vatRate === 0 ? total : total / (1 + vatRate / 100);
-    
-    // Update the subtotal field
-    form.setFieldsValue({ subtotal: parseFloat(subtotal.toFixed(2)) });
-    
-    // Update the TRY equivalent
-    updateTryValues(
-      subtotal,
-      vatRate,
-      total,
-      form.getFieldValue('currency')
+  // Topbar right slot
+  const { setRight } = useContext(TopBarContext);
+  useEffect(() => {
+    setRight(
+      isEditMode ? (
+        <span style={{ fontSize: 12.5, color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <ClockCircleOutlined />Düzenleniyor
+        </span>
+      ) : null
     );
-  };
+    return () => setRight(null);
+  }, [setRight, isEditMode]);
 
-  const handleManualTotalChange = (checked) => {
-    setManualTotal(checked);
-    if (!checked) {
-      // If switching back to automatic, recalculate the total
-      calculateTotal();
-    }
-  };
-
-  const currencyChangeHandler = (value) => {
-    // Recalculate total when currency changes
-    setTimeout(() => {
-      calculateTotal();
-    }, 0);
-  };
+  if (loading) {
+    return (
+      <div className="tt-page" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <Row gutter={[16, 16]} align="middle" className="page-header">
-        <Col span={16}>
-          <Title level={2}>{isEditing ? 'Fatura Düzenle' : 'Yeni Fatura'}</Title>
-        </Col>
-        <Col span={8} style={{ textAlign: 'right' }}>
-          <Button 
-            icon={<ArrowLeftOutlined />} 
-            onClick={() => navigate('/invoices')}
-          >
-            Geri Dön
+    <div className="tt-page">
+      <div className="form-grid">
+        {/* LEFT: metadata card */}
+        <div className="card form-card">
+          <h3>Fatura Bilgileri</h3>
+          <div className="field-grid">
+            <div className="field full">
+              <label className="field-label">Şirket</label>
+              <Input
+                className="input-lg"
+                placeholder="Şirket adı"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+              />
+              <span className="field-hint">Mevcut kayıtlardan seçin veya yeni şirket ekleyin</span>
+            </div>
+            <div className="field">
+              <label className="field-label">Fatura No</label>
+              <Input
+                className="input-lg"
+                value={invoiceNo}
+                onChange={(e) => setInvoiceNo(e.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label className="field-label">Tarih</label>
+              <DatePicker
+                className="input-lg"
+                style={{ width: '100%' }}
+                value={date}
+                onChange={setDate}
+                format="DD/MM/YYYY"
+                allowClear={false}
+              />
+            </div>
+            <div className="field full">
+              <label className="field-label">Tür</label>
+              <Segmented
+                value={invoiceType}
+                onChange={setInvoiceType}
+                options={[
+                  { label: 'Alış', value: 'Alış' },
+                  { label: 'Satış', value: 'Satış' },
+                ]}
+              />
+            </div>
+            <div className="field full">
+              <label className="field-label">Açıklama</label>
+              <TextArea
+                className="input-lg"
+                rows={3}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: money zone */}
+        <InvoiceFormMoneyZone
+          currency={currency}
+          onCurrencyChange={setCurrency}
+          subtotal={subtotal}
+          onSubtotalChange={setSubtotal}
+          vatRate={vatRate}
+          onVatRateChange={setVatRate}
+          fxRate={fxRate}
+          fxPeriodLabel={date ? dayjs(date).locale('tr').format('MMMM YYYY') : ''}
+          manualTotal={manualTotal}
+          manualTotalValue={total}
+          onManualTotalChange={setTotal}
+          onManualToggle={setManualTotal}
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="form-footer">
+        <span className="meta">
+          <InfoCircleOutlined />
+          {validationOk
+            ? 'Tüm zorunlu alanlar dolduruldu · değişiklikler geri alınabilir'
+            : 'Lütfen zorunlu alanları doldurun'}
+        </span>
+        <div className="right">
+          <Button onClick={() => navigate('/invoices')}>İptal</Button>
+          {!isEditMode && (
+            <Button onClick={() => handleSave(true)}>Kaydet & Yeni Ekle</Button>
+          )}
+          <Button type="primary" icon={<SaveOutlined />} loading={saving} onClick={() => handleSave(false)}>
+            Kaydet
           </Button>
-        </Col>
-      </Row>
-
-      <Card>
-        <Spin spinning={loading}>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSubmit}
-            initialValues={{
-              date: dayjs(),
-              currency: 'TRY',
-              vat_rate: 0,
-              subtotal: 0,
-              total: 0,
-              invoice_type: 'Alış',
-              description: ''
-            }}
-            className="form-container"
-          >
-            <Row gutter={16}>
-              <Col span={6}>
-                <Form.Item
-                  name="company"
-                  label="Şirket İsmi"
-                  rules={[{ required: true, message: 'Lütfen şirket ismi girin' }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item
-                  name="invoice_no"
-                  label="Fatura No"
-                  rules={[{ required: true, message: 'Lütfen fatura numarası girin' }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item
-                  name="date"
-                  label="Tarih"
-                  rules={[{ required: true, message: 'Lütfen tarih seçin' }]}
-                >
-                  <DatePicker 
-                    style={{ width: '100%' }} 
-                    format="DD/MM/YYYY"
-                    onChange={(date) => {
-                      if (date) {
-                        fetchFxRatesForDate(date);
-                      }
-                    }}
-                  />
-                </Form.Item>
-              </Col>
-              <Col span={6}>
-                <Form.Item
-                  name="invoice_type"
-                  label="Fatura Tipi"
-                  rules={[{ required: true, message: 'Lütfen fatura tipi seçin' }]}
-                >
-                  <Select>
-                    <Option value="Alış">Alış</Option>
-                    <Option value="Satış">Satış</Option>
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={24}>
-                <Form.Item
-                  name="description"
-                  label="Açıklama"
-                >
-                  <Input.TextArea rows={2} placeholder="İsteğe bağlı açıklama" />
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
-                  name="vat_rate"
-                  label="KDV Oranı (%)"
-                  rules={[{ required: true, message: 'Lütfen KDV oranı girin' }]}
-                >
-                  <Select onChange={calculateTotal}>
-                    <Option value={0}>0%</Option>
-                    <Option value={5}>5%</Option>
-                    <Option value={10}>10%</Option>
-                    <Option value={16}>16%</Option>
-                    <Option value={20}>20%</Option>
-                  </Select>
-                </Form.Item>
-                <div style={{ marginTop: -15, marginBottom: 16 }}>
-                  <small style={{ color: 'var(--color-text-muted)' }}>KDV Tutarı (TL): {tryValues.vatAmount.toFixed(2)} TL</small>
-                </div>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="currency"
-                  label="Para Birimi"
-                  rules={[{ required: true, message: 'Lütfen para birimi seçin' }]}
-                >
-                  <Select onChange={currencyChangeHandler}>
-                    <Option value="TRY">TRY</Option>
-                    <Option value="USD">USD</Option>
-                    <Option value="EUR">EUR</Option>
-                  </Select>
-                </Form.Item>
-                {fxRates && form.getFieldValue('currency') !== 'TRY' && (
-                  <div style={{ marginTop: -15, marginBottom: 16 }}>
-                    <small style={{ color: 'var(--color-text-muted)' }}>
-                      Kur: {form.getFieldValue('currency') === 'USD' ? fxRates.usd_to_try : fxRates.eur_to_try} TL
-                    </small>
-                  </div>
-                )}
-              </Col>
-            </Row>
-
-            <Divider style={{ background: form.getFieldValue('invoice_type') === 'Alış' ? 'var(--color-accent)' : 'var(--color-success)' }} />
-
-            <Row gutter={16}>
-              <Col span={8}>
-                <Form.Item
-                  name="subtotal"
-                  label="Ara Toplam"
-                  rules={[{ required: true, message: 'Lütfen ara toplam girin' }]}
-                >
-                  <InputNumber 
-                    style={{ width: '100%' }}
-                    min={0}
-                    step={0.01}
-                    precision={2}
-                    onChange={calculateTotal}
-                    disabled={manualTotal}
-                  />
-                </Form.Item>
-                <div style={{ marginTop: -15, marginBottom: 16 }}>
-                  <small style={{ color: 'var(--color-text-muted)' }}>TL Karşılığı: {tryValues.subtotal.toFixed(2)} TL</small>
-                </div>
-              </Col>
-              <Col span={8}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Form.Item
-                    name="total"
-                    label="Genel Toplam"
-                    style={{ flex: 1, marginRight: 8 }}
-                    rules={[{ required: true, message: 'Genel toplam gerekli' }]}
-                  >
-                    <InputNumber 
-                      style={{ width: '100%' }}
-                      min={0}
-                      step={0.01}
-                      precision={2}
-                      disabled={!manualTotal}
-                      onChange={handleTotalChange}
-                    />
-                  </Form.Item>
-                  <Form.Item label="Manuel">
-                    <Switch checked={manualTotal} onChange={handleManualTotalChange} />
-                  </Form.Item>
-                </div>
-                <div style={{ marginTop: -15 }}>
-                  <small style={{ color: 'var(--color-text-muted)' }}>TL Karşılığı: {tryValues.total.toFixed(2)} TL</small>
-                </div>
-              </Col>
-              <Col span={8} style={{ textAlign: 'right', marginTop: 30 }}>
-                <Form.Item>
-                  <Button 
-                    type="primary" 
-                    htmlType="submit" 
-                    icon={<SaveOutlined />}
-                    loading={loading}
-                  >
-                    {isEditing ? 'Güncelle' : 'Kaydet'}
-                  </Button>
-                </Form.Item>
-              </Col>
-            </Row>
-          </Form>
-        </Spin>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default InvoiceForm; 
+export default InvoiceForm;
