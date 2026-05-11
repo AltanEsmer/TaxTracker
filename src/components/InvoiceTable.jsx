@@ -66,18 +66,24 @@ const AmountCell = ({ amount, currency, tryEquivalent }) => {
       >
         {fmtCur(amount, currency)}
       </span>
-      <span style={{ font: '400 11.5px "JetBrains Mono"', color: 'var(--text-tertiary)' }}>
-        {isForeign ? '≈ ' + fmtTRY(tryEquivalent) : 'TRY'}
-      </span>
+      {isForeign ? (
+        tryEquivalent != null ? (
+          <span style={{ font: '400 11.5px "JetBrains Mono"', color: 'var(--text-tertiary)' }}>
+            ≈ {fmtTRY(tryEquivalent)}
+          </span>
+        ) : (
+          <span style={{ font: '500 11px "Inter Tight"', color: 'var(--color-danger)' }}>
+            Kur eksik
+          </span>
+        )
+      ) : (
+        <span style={{ font: '400 11.5px "JetBrains Mono"', color: 'var(--text-tertiary)' }}>
+          TRY
+        </span>
+      )}
     </div>
   );
 };
-
-const TotalCell = ({ total, currency }) => (
-  <span style={{ font: '500 13px "JetBrains Mono"', color: 'var(--text-primary)', fontVariantNumeric: 'tabular-nums' }}>
-    {fmtCur(total, currency)}
-  </span>
-);
 
 function FooterStat({ label, value, size = 13, color = 'var(--text-primary)' }) {
   return (
@@ -176,7 +182,7 @@ export default function InvoiceTable({ rows, selectedRowKeys, onSelectChange, on
         <AmountCell
           amount={row.subtotal}
           currency={row.currency}
-          tryEquivalent={row.try_equivalent?.subtotal ?? row.subtotal}
+          tryEquivalent={row.try_equivalent?.subtotal}
         />
       ),
     },
@@ -196,7 +202,13 @@ export default function InvoiceTable({ rows, selectedRowKeys, onSelectChange, on
       dataIndex: 'total',
       width: 140,
       align: 'right',
-      render: (_, row) => <TotalCell total={row.total} currency={row.currency} />,
+      render: (_, row) => (
+        <AmountCell
+          amount={row.total}
+          currency={row.currency}
+          tryEquivalent={row.try_equivalent?.total}
+        />
+      ),
       sorter: (a, b) => (a.try_equivalent?.total ?? a.total) - (b.try_equivalent?.total ?? b.total),
     },
     {

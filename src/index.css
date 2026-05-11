@@ -1121,6 +1121,53 @@ body {
   box-shadow: 0 0 0 3px rgba(31, 63, 229, 0.12);
 }
 
+/* AntD Select carrying .input-lg should match native input height/colors */
+.ant-select.input-lg .ant-select-selector {
+  height: 38px !important;
+  padding: 0 12px !important;
+  background: var(--surface-base) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--r-md) !important;
+  display: flex;
+  align-items: center;
+}
+.ant-select.input-lg .ant-select-selection-item,
+.ant-select.input-lg .ant-select-selection-placeholder {
+  line-height: 36px !important;
+  font: 400 13.5px var(--font-sans) !important;
+  color: var(--text-primary);
+}
+.ant-select.input-lg .ant-select-arrow { color: var(--text-tertiary); }
+.ant-select.input-lg.ant-select-focused .ant-select-selector,
+.ant-select.input-lg .ant-select-selector:hover {
+  border-color: var(--color-primary-600) !important;
+  box-shadow: 0 0 0 3px rgba(31, 63, 229, 0.12) !important;
+}
+
+/* AntD DatePicker parity */
+.ant-picker.input-lg {
+  height: 38px !important;
+  padding: 0 12px !important;
+  background: var(--surface-base) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: var(--r-md) !important;
+}
+.ant-picker.input-lg .ant-picker-input > input {
+  font: 400 13.5px var(--font-sans) !important;
+  color: var(--text-primary);
+}
+.ant-picker.input-lg.ant-picker-focused,
+.ant-picker.input-lg:hover {
+  border-color: var(--color-primary-600) !important;
+  box-shadow: 0 0 0 3px rgba(31, 63, 229, 0.12) !important;
+}
+
+/* InputNumber inner input height safety */
+.ant-input-number.input-lg .ant-input-number-input {
+  height: 36px !important;
+  padding: 0 12px !important;
+}
+
 textarea.input-lg {
   padding: 10px 12px;
   height: 80px;
@@ -1318,7 +1365,6 @@ textarea.input-lg {
 }
 
 .fx-period { display: flex; gap: 10px; margin-bottom: 24px; }
-.fx-period .input-lg { width: 50%; }
 
 .fx-cur-block {
   padding: 18px 20px;

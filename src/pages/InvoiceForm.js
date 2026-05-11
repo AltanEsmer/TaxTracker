@@ -1,5 +1,5 @@
 // InvoiceForm — Quiet Premium redesign (Slice 3)
-import { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { Input, DatePicker, Segmented, Button, Spin, message } from 'antd';
 import { SaveOutlined, ClockCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -7,6 +7,8 @@ import dayjs from 'dayjs';
 import 'dayjs/locale/tr';
 import InvoiceFormMoneyZone from '../components/InvoiceFormMoneyZone';
 import { TopBarContext } from '../App';
+
+dayjs.locale('tr');
 
 const { TextArea } = Input;
 
@@ -28,6 +30,29 @@ const InvoiceForm = () => {
   const [fxRate, setFxRate] = useState(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(isEditMode);
+  const [customKdvRates, setCustomKdvRates] = useState([]);
+
+  // Fetch custom KDV rates once on mount
+  useEffect(() => {
+    if (!window.api?.getKdvRates) return;
+    window.api.getKdvRates()
+      .then(rows => setCustomKdvRates(Array.isArray(rows) ? rows : []))
+      .catch(() => {});
+  }, []);
+
+  // Merged + sorted vatOptions (default rates + custom rates)
+  const vatOptions = useMemo(() => {
+    const map = new Map();
+    [0, 5, 10, 16, 20].forEach(r => map.set(r, { rate: r }));
+    customKdvRates.forEach(r => {
+      const rateNum = Number(r.rate);
+      if (Number.isFinite(rateNum)) map.set(rateNum, { rate: rateNum, label: r.label });
+    });
+    if (vatRate != null && !map.has(Number(vatRate))) {
+      map.set(Number(vatRate), { rate: Number(vatRate) });
+    }
+    return [...map.values()].sort((a, b) => a.rate - b.rate);
+  }, [customKdvRates, vatRate]);
 
   // Auto-compute total unless manual override
   useEffect(() => {
@@ -76,6 +101,10 @@ const InvoiceForm = () => {
   const handleSave = async (createAnother) => {
     if (!validationOk) { message.warning('Lütfen tüm zorunlu alanları doldurun'); return; }
     if (!window.api) { message.error('window.api bulunamadı'); return; }
+    if (currency !== 'TRY' && (!fxRate || fxRate <= 0)) {
+      message.warning(`${currency}/TRY kuru tanımlı değil. Kur Yönetimi sayfasından ${date?.format('MMMM YYYY')} ayı için kur ekleyin.`);
+      return;
+    }
     setSaving(true);
     const vatAmount = Number(total) - Number(subtotal);
     const payload = {
@@ -205,11 +234,13 @@ const InvoiceForm = () => {
           vatRate={vatRate}
           onVatRateChange={setVatRate}
           fxRate={fxRate}
-          fxPeriodLabel={date ? dayjs(date).locale('tr').format('MMMM YYYY') : ''}
+          fxPeriodLabel={date ? dayjs(date).format('MMMM YYYY') : ''}
           manualTotal={manualTotal}
           manualTotalValue={total}
           onManualTotalChange={setTotal}
           onManualToggle={setManualTotal}
+          vatOptions={vatOptions}
+          fxMissing={currency !== 'TRY' && (!fxRate || fxRate <= 0)}
         />
       </div>
 

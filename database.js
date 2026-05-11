@@ -99,6 +99,19 @@ class DatabaseManager {
         this.saveFxRates();
       }
 
+      // Backfill: any foreign invoice missing try_equivalent gets it computed if FX rate exists
+      let _backfilled = false;
+      for (const inv of this.invoices) {
+        if (!inv.try_equivalent) {
+          const te = this._computeTryEquivalent(inv);
+          if (te) {
+            inv.try_equivalent = te;
+            _backfilled = true;
+          }
+        }
+      }
+      if (_backfilled) this.saveInvoices();
+
       if (fs.existsSync(this.kdvRatesPath)) {
         const data = fs.readFileSync(this.kdvRatesPath, 'utf8');
         this.kdvRates = JSON.parse(data);
@@ -332,12 +345,13 @@ class DatabaseManager {
         : 1;
       
       // Ensure invoice_type is set, default to 'Alış' if not provided
-      const newInvoice = { 
-        id, 
+      const newInvoice = {
+        id,
         ...invoice,
         invoice_type: invoice.invoice_type || 'Alış'
       };
-      
+      newInvoice.try_equivalent = this._computeTryEquivalent(newInvoice);
+
       this.invoices.push(newInvoice);
       this.saveInvoices();
       
@@ -354,11 +368,12 @@ class DatabaseManager {
       const index = this.invoices.findIndex(inv => inv.id === Number(id));
       
       if (index !== -1) {
-        this.invoices[index] = { 
-          id: Number(id), 
+        this.invoices[index] = {
+          id: Number(id),
           ...invoice,
           invoice_type: invoice.invoice_type || 'Alış'
         };
+        this.invoices[index].try_equivalent = this._computeTryEquivalent(this.invoices[index]);
         this.saveInvoices();
         return this.invoices[index];
       } else {
@@ -387,33 +402,32 @@ class DatabaseManager {
     }
   }
 
+  _computeTryEquivalent(invoice) {
+    if (invoice.currency === 'TRY') {
+      return {
+        subtotal: invoice.subtotal,
+        vat_amount: invoice.subtotal * (invoice.vat_rate / 100),
+        total: invoice.total,
+      };
+    }
+    const d = new Date(invoice.date);
+    const fx = this.fxRates.find(r => r.year === d.getFullYear() && r.month === d.getMonth() + 1);
+    if (!fx) return null;
+    let rate = null;
+    if (invoice.currency === 'USD' && fx.usd_to_try) rate = fx.usd_to_try;
+    else if (invoice.currency === 'EUR' && fx.eur_to_try) rate = fx.eur_to_try;
+    if (!rate) return null;
+    return {
+      subtotal: invoice.subtotal * rate,
+      vat_amount: (invoice.subtotal * (invoice.vat_rate / 100)) * rate,
+      total: invoice.total * rate,
+      rate,
+    };
+  }
+
   recomputeAllTryEquivalents() {
     this.invoices = this.invoices.map(invoice => {
-      if (invoice.currency === 'TRY') {
-        invoice.try_equivalent = {
-          subtotal: invoice.subtotal,
-          vat_amount: invoice.subtotal * (invoice.vat_rate / 100),
-          total: invoice.total
-        };
-        return invoice;
-      }
-      const invoiceDate = new Date(invoice.date);
-      const year = invoiceDate.getFullYear();
-      const month = invoiceDate.getMonth() + 1;
-      const fxRate = this.fxRates.find(r => r.year === year && r.month === month);
-      if (fxRate) {
-        let rate = 1;
-        if (invoice.currency === 'USD' && fxRate.usd_to_try) rate = fxRate.usd_to_try;
-        else if (invoice.currency === 'EUR' && fxRate.eur_to_try) rate = fxRate.eur_to_try;
-        invoice.try_equivalent = {
-          subtotal: invoice.subtotal * rate,
-          vat_amount: (invoice.subtotal * (invoice.vat_rate / 100)) * rate,
-          total: invoice.total * rate,
-          rate
-        };
-      } else {
-        invoice.try_equivalent = null;
-      }
+      invoice.try_equivalent = this._computeTryEquivalent(invoice);
       return invoice;
     });
     this.saveInvoices();

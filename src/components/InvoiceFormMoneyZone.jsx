@@ -3,7 +3,7 @@ import React, { useMemo } from 'react';
 import { Segmented, InputNumber, Switch } from 'antd';
 import { SwapOutlined } from '@ant-design/icons';
 
-const VAT_RATES = [0, 5, 10, 16, 20];
+const DEFAULT_VAT_OPTIONS = [0, 5, 10, 16, 20].map(r => ({ rate: r }));
 const CUR_SYMBOL = { TRY: '₺', USD: '$', EUR: '€' };
 
 const fmt = (n) =>
@@ -22,6 +22,8 @@ export default function InvoiceFormMoneyZone({
   manualTotalValue,
   onManualTotalChange,
   onManualToggle,
+  vatOptions = DEFAULT_VAT_OPTIONS,
+  fxMissing = false,
 }) {
   const computedTotal = useMemo(() => subtotal * (1 + vatRate / 100), [subtotal, vatRate]);
   const displayTotal = manualTotal && manualTotalValue != null ? manualTotalValue : computedTotal;
@@ -70,14 +72,15 @@ export default function InvoiceFormMoneyZone({
       <div className="field" style={{ marginBottom: 18 }}>
         <label className="field-label">KDV Oranı</label>
         <div className="vat-chips">
-          {VAT_RATES.map((r) => (
+          {vatOptions.map((opt) => (
             <button
-              key={r}
+              key={opt.rate}
               type="button"
-              className={r === vatRate ? 'active' : ''}
-              onClick={() => onVatRateChange(r)}
+              title={opt.label || `%${opt.rate} KDV`}
+              className={opt.rate === vatRate ? 'active' : ''}
+              onClick={() => onVatRateChange(opt.rate)}
             >
-              %{r}
+              %{opt.rate}
             </button>
           ))}
         </div>
@@ -120,7 +123,20 @@ export default function InvoiceFormMoneyZone({
         </div>
       </div>
 
-      {isForeign && (
+      {isForeign && fxMissing && (
+        <div className="fx-reveal" role="note" style={{ borderColor: 'rgba(220, 38, 38, 0.3)', background: 'rgba(220, 38, 38, 0.06)' }}>
+          <span className="ico" style={{ color: 'var(--color-danger)' }}><SwapOutlined /></span>
+          <div className="body">
+            <div className="t" style={{ color: 'var(--color-danger)' }}>
+              {fxPeriodLabel} {currency}/TRY kuru tanımlı değil
+            </div>
+            <div className="s">
+              Kur Yönetimi sayfasından bu ay için kur ekleyin
+            </div>
+          </div>
+        </div>
+      )}
+      {isForeign && !fxMissing && (
         <div className="fx-reveal" role="note">
           <span className="ico"><SwapOutlined /></span>
           <div className="body">
