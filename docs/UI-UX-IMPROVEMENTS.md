@@ -1,5 +1,20 @@
 # TaxTracker — UI/UX Improvement Guide
 
+> **Status (2026-05-11):** Most issues identified below have been resolved by the **"Quiet Premium"** redesign on branch `redesign/quiet-premium`. See [`docs/STYLE-GUIDE.md` §13](STYLE-GUIDE.md#13-quiet-premium-active) for the current design system. The original audit and recommendations are kept here for historical context.
+>
+> **Resolved by the redesign:**
+> - Active menu item now derives from `useLocation()` in `src/App.js`
+> - Save dialog flow already in place via `window.api.showSaveDialog`
+> - Description field present on `InvoiceForm`
+> - Dark mode shipped (toggle in sidebar footer, `localStorage['taxtracker-theme']`)
+> - Currency display uses dual-line cells (native + TRY equivalent) with currency-coloured numerics
+> - Form layout split into 2-column metadata + money zone with VAT chip selector
+>
+> **Still open** (not addressed by the redesign):
+> - Unsaved-changes warning when leaving `InvoiceForm`
+> - Bulk-edit beyond bulk-delete on `InvoiceList`
+> - Pagination control on `InvoiceList` (currently single scroll)
+
 ## 1. Overview
 
 TaxTracker's UI is built with Ant Design 5 and covers the core workflows well: entering invoices, managing FX rates, and viewing a summary dashboard. However, several implementation bugs make the interface feel inconsistent (navigation never highlights the active page), and a handful of missing features create friction in daily use (no description field, no save-file dialog, no unsaved-changes warning).

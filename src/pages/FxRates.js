@@ -1,435 +1,243 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Table, 
-  Button, 
-  Form, 
-  InputNumber, 
-  Select, 
-  Typography, 
-  Row, 
-  Col, 
-  Card, 
-  message, 
-  Spin,
-  Popconfirm,
-  Space
-} from 'antd';
-import { 
-  SaveOutlined, 
-  EditOutlined,
-  PlusOutlined,
-  DeleteOutlined
-} from '@ant-design/icons';
-import dayjs from 'dayjs';
+// FxRates — Quiet Premium redesign (Slice 4)
+import { useContext, useEffect, useState, useMemo, useCallback } from 'react';
+import { Button, Spin, message, Popconfirm, InputNumber, Select } from 'antd';
+import { CalendarOutlined, EditOutlined, DeleteOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { TopBarContext } from '../App';
 
-const { Title } = Typography;
-const { Option } = Select;
+const MONTHS_TR = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+const MONTH_OPTIONS = MONTHS_TR.map((m, i) => ({ label: m, value: i + 1 }));
+
+const now = new Date();
 
 const FxRates = () => {
-  const [form] = Form.useForm();
-  const [loading, setLoading] = useState(true);
-  const [fxRates, setFxRates] = useState([]);
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [usd1, setUsd1] = useState(0);
+  const [usd2, setUsd2] = useState(0);
+  const [usd3, setUsd3] = useState(0);
+  const [eur1, setEur1] = useState(0);
+  const [eur2, setEur2] = useState(0);
+  const [eur3, setEur3] = useState(0);
   const [editingId, setEditingId] = useState(null);
-  const [years, setYears] = useState([]);
-  const [months, setMonths] = useState([]);
-  const [usdRates, setUsdRates] = useState({ rate1: 0, rate2: 0, rate3: 0 });
-  const [eurRates, setEurRates] = useState({ rate1: 0, rate2: 0, rate3: 0 });
-  
-  useEffect(() => {
-    if (!window.api) {
-      message.error('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
-      setLoading(false);
-      return;
-    }
-    const currentYear = dayjs().year();
-    const yearOptions = Array.from({ length: 11 }, (_, i) => currentYear - 5 + i);
-    setYears(yearOptions);
-    
-    // Generate months
-    const monthOptions = [];
-    for (let i = 1; i <= 12; i++) {
-      monthOptions.push(i);
-    }
-    setMonths(monthOptions);
-    
-    fetchFxRates();
-  }, []);
+  const [rates, setRates] = useState([]);
+  const [invoiceCounts, setInvoiceCounts] = useState({});
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const isEditing = editingId != null;
 
-  const fetchFxRates = async () => {
+  const { setRight } = useContext(TopBarContext);
+
+  const usdAvg = useMemo(() => {
+    const vals = [usd1, usd2, usd3].map(Number).filter(v => v > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }, [usd1, usd2, usd3]);
+
+  const eurAvg = useMemo(() => {
+    const vals = [eur1, eur2, eur3].map(Number).filter(v => v > 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  }, [eur1, eur2, eur3]);
+
+  const sortedRates = useMemo(() =>
+    [...rates].sort((a, b) => b.year - a.year || b.month - a.month).slice(0, 12)
+  , [rates]);
+
+  const affectedCount = invoiceCounts[`${year}-${month}`] ?? 0;
+
+  const fetchRates = useCallback(async () => {
+    setLoading(true);
     try {
-      setLoading(true);
       const data = await window.api.getFxRates();
-      setFxRates(data);
-    } catch (error) {
-
-      message.error('Kur bilgileri yüklenirken bir hata oluştu.');
+      setRates(Array.isArray(data) ? data : []);
+      const counts = {};
+      const allInvoices = await window.api.getInvoices({});
+      for (const inv of allInvoices || []) {
+        if (inv.currency === 'TRY') continue;
+        const d = new Date(inv.date);
+        const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
+        counts[key] = (counts[key] || 0) + 1;
+      }
+      setInvoiceCounts(counts);
+    } catch (e) {
+      message.error(`Kurlar yüklenemedi: ${e?.message || ''}`);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const calculateUsdAverage = (rate1, rate2, rate3) => {
-    const validRates = [rate1, rate2, rate3].filter(r => r && r > 0);
-    if (validRates.length === 0) return 0;
-    const avg = validRates.reduce((sum, r) => sum + r, 0) / validRates.length;
-    form.setFieldsValue({ usd_to_try: parseFloat(avg.toFixed(4)) });
-    return avg;
-  };
+  useEffect(() => { fetchRates(); }, [fetchRates]);
 
-  const calculateEurAverage = (rate1, rate2, rate3) => {
-    const validRates = [rate1, rate2, rate3].filter(r => r && r > 0);
-    if (validRates.length === 0) return 0;
-    const avg = validRates.reduce((sum, r) => sum + r, 0) / validRates.length;
-    form.setFieldsValue({ eur_to_try: parseFloat(avg.toFixed(4)) });
-    return avg;
-  };
+  useEffect(() => {
+    setRight(
+      <span className="pill-filter"><CalendarOutlined />{year}</span>
+    );
+    return () => setRight(null);
+  }, [setRight, year]);
 
-  const handleUsdRateChange = (field, value) => {
-    const newRates = { ...usdRates, [field]: value || 0 };
-    setUsdRates(newRates);
-    calculateUsdAverage(newRates.rate1, newRates.rate2, newRates.rate3);
-  };
-
-  const handleEurRateChange = (field, value) => {
-    const newRates = { ...eurRates, [field]: value || 0 };
-    setEurRates(newRates);
-    calculateEurAverage(newRates.rate1, newRates.rate2, newRates.rate3);
-  };
-
-  const handleSubmit = async (values) => {
+  const handleSave = async () => {
+    if (usdAvg <= 0 || eurAvg <= 0) { message.warning('USD ve EUR için en az bir geçerli değer girin'); return; }
+    setSaving(true);
     try {
-      setLoading(true);
-      
-      if (editingId) {
-        await window.api.updateFxRate(editingId, values);
-        message.success('Kur bilgisi başarıyla güncellendi.');
-      } else {
-        // Check if the month/year combination already exists
-        const exists = fxRates.some(
-          rate => rate.month === values.month && rate.year === values.year
-        );
-        
-        if (exists) {
-          message.error('Bu ay için kur bilgisi zaten mevcut.');
-          setLoading(false);
-          return;
-        }
-        
-        await window.api.addFxRate(values);
-        message.success('Kur bilgisi başarıyla eklendi.');
-      }
-      
-      // Reset form and state
-      form.resetFields();
-      setEditingId(null);
-      setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
-      setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
-      
-      // Refresh data
-      fetchFxRates();
-    } catch (error) {
-
-      message.error('Kur bilgisi kaydedilirken bir hata oluştu.');
-      setLoading(false);
+      const payload = { year, month, usd_to_try: usdAvg, eur_to_try: eurAvg };
+      if (editingId) await window.api.updateFxRate(editingId, payload);
+      else await window.api.addFxRate(payload);
+      message.success(editingId ? 'Kur güncellendi' : 'Kur eklendi');
+      handleReset();
+      fetchRates();
+    } catch (e) {
+      message.error(`Kayıt başarısız: ${e?.message || ''}`);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleEdit = (record) => {
-    setEditingId(record.id);
-    form.setFieldsValue(record);
-    // Reset sub-rate calculation fields when editing
-    setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
-    setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
+  const handleEdit = (rate) => {
+    setEditingId(rate.id);
+    setYear(rate.year);
+    setMonth(rate.month);
+    setUsd1(rate.usd_to_try);
+    setUsd2(0);
+    setUsd3(0);
+    setEur1(rate.eur_to_try);
+    setEur2(0);
+    setEur3(0);
   };
 
-  const handleCancel = () => {
+  const handleDelete = async (id) => {
+    try {
+      await window.api.deleteFxRate(id);
+      message.success('Kur silindi');
+      if (id === editingId) handleReset();
+      fetchRates();
+    } catch (e) {
+      message.error(`Silinemedi: ${e?.message || ''}`);
+    }
+  };
+
+  const handleReset = () => {
     setEditingId(null);
-    form.resetFields();
-    setUsdRates({ rate1: 0, rate2: 0, rate3: 0 });
-    setEurRates({ rate1: 0, rate2: 0, rate3: 0 });
+    setUsd1(0); setUsd2(0); setUsd3(0);
+    setEur1(0); setEur2(0); setEur3(0);
+    setYear(now.getFullYear());
+    setMonth(now.getMonth() + 1);
   };
 
-  const handleDelete = async (record) => {
-    try {
-      const result = await window.api.deleteFxRate(record.id);
-      
-      if (result.hasInvoices) {
-        message.warning(`Kur bilgisi silindi. Bu aya ait ${result.invoiceCount} fatura bulunmaktadır.`);
-      } else {
-        message.success('Kur bilgisi başarıyla silindi.');
-      }
-      
-      fetchFxRates();
-    } catch (error) {
-
-      message.error('Kur bilgisi silinirken bir hata oluştu.');
-    }
-  };
-
-  const getMonthName = (monthNumber) => {
-    const monthNames = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
-    return monthNames[monthNumber - 1];
-  };
-
-  const columns = [
-    {
-      title: 'Yıl',
-      dataIndex: 'year',
-      key: 'year',
-      sorter: (a, b) => a.year - b.year
-    },
-    {
-      title: 'Ay',
-      dataIndex: 'month',
-      key: 'month',
-      render: month => getMonthName(month),
-      sorter: (a, b) => a.month - b.month
-    },
-    {
-      title: 'USD/TRY',
-      dataIndex: 'usd_to_try',
-      key: 'usd_to_try',
-      render: value => (typeof value === 'number' ? value.toFixed(4) : '-')
-    },
-    {
-      title: 'EUR/TRY',
-      dataIndex: 'eur_to_try',
-      key: 'eur_to_try',
-      render: value => (typeof value === 'number' ? value.toFixed(4) : '-')
-    },
-    {
-      title: 'İşlemler',
-      key: 'action',
-      render: (_, record) => (
-        <Space size="small">
-          <Button 
-            type="primary" 
-            icon={<EditOutlined />} 
-            size="small"
-            onClick={() => handleEdit(record)}
-          />
-          <Popconfirm
-            title="Bu kur bilgisini silmek istediğinizden emin misiniz?"
-            description={`${getMonthName(record.month)} ${record.year} için kur bilgisi silinecek.`}
-            onConfirm={() => handleDelete(record)}
-            okText="Evet"
-            cancelText="Hayır"
-          >
-            <Button 
-              type="primary" 
-              danger
-              icon={<DeleteOutlined />} 
-              size="small"
-            />
-          </Popconfirm>
-        </Space>
-      ),
-    },
-  ];
+  if (loading) {
+    return (
+      <div className="tt-page" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 320 }}>
+        <Spin size="large" />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <Row gutter={[16, 16]} align="middle" className="page-header">
-        <Col span={24}>
-          <Title level={2}>Kur Yönetimi</Title>
-        </Col>
-      </Row>
+    <div className="tt-page">
+      <div className="fx-grid">
+        <div className="card fx-card">
+          <h3>Aylık Kur Ekle / Düzenle</h3>
+          <div className="fx-period">
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-label">Yıl</label>
+              <InputNumber className="input-lg" style={{ width: '100%' }} value={year} onChange={setYear} disabled={isEditing} min={2000} max={2099} controls={false} />
+            </div>
+            <div className="field" style={{ flex: 1 }}>
+              <label className="field-label">Ay</label>
+              <Select className="input-lg" style={{ width: '100%' }} value={month} onChange={setMonth} disabled={isEditing} options={MONTH_OPTIONS} />
+            </div>
+          </div>
 
-      <Row gutter={16}>
-        <Col span={24}>
-          <Card title={editingId ? 'Kur Bilgisi Düzenle' : 'Yeni Kur Bilgisi Ekle'} style={{ marginBottom: 'var(--space-6)' }}>
-            <Form
-              form={form}
-              layout="horizontal"
-              onFinish={handleSubmit}
-              initialValues={{
-                year: dayjs().year(),
-                month: new Date().getMonth() + 1,
-                usd_to_try: 0,
-                eur_to_try: 0
-              }}
-            >
-              <Row gutter={16}>
-                <Col span={6}>
-                  <Form.Item
-                    name="year"
-                    label="Yıl"
-                    rules={[{ required: true, message: 'Lütfen yıl seçin' }]}
-                  >
-                    <Select disabled={editingId}>
-                      {years.map(year => (
-                        <Option key={year} value={year}>{year}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col span={6}>
-                  <Form.Item
-                    name="month"
-                    label="Ay"
-                    rules={[{ required: true, message: 'Lütfen ay seçin' }]}
-                  >
-                    <Select disabled={editingId}>
-                      {months.map(month => (
-                        <Option key={month} value={month}>{getMonthName(month)}</Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-              </Row>
-              
-              <Row gutter={16}>
-                <Col span={12}>
-                  <Title level={5}>USD/TRY Kur Hesaplama</Title>
-                  <Row gutter={8}>
-                    <Col span={8}>
-                      <Form.Item label="Kur 1">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={usdRates.rate1}
-                          onChange={(value) => handleUsdRateChange('rate1', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Kur 2">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={usdRates.rate2}
-                          onChange={(value) => handleUsdRateChange('rate2', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Kur 3">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={usdRates.rate3}
-                          onChange={(value) => handleUsdRateChange('rate3', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                  <Form.Item
-                    name="usd_to_try"
-                    label="Ortalama USD/TRY"
-                    rules={[{ required: true, message: 'Lütfen USD/TRY kurunu girin' }]}
-                  >
-                    <InputNumber 
-                      style={{ width: '100%' }}
-                      min={0}
-                      step={0.0001}
-                      precision={4}
-                    />
-                  </Form.Item>
-                </Col>
-                
-                <Col span={12}>
-                  <Title level={5}>EUR/TRY Kur Hesaplama</Title>
-                  <Row gutter={8}>
-                    <Col span={8}>
-                      <Form.Item label="Kur 1">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={eurRates.rate1}
-                          onChange={(value) => handleEurRateChange('rate1', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Kur 2">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={eurRates.rate2}
-                          onChange={(value) => handleEurRateChange('rate2', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Kur 3">
-                        <InputNumber 
-                          style={{ width: '100%' }}
-                          min={0}
-                          step={0.0001}
-                          precision={4}
-                          value={eurRates.rate3}
-                          onChange={(value) => handleEurRateChange('rate3', value)}
-                        />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                  <Form.Item
-                    name="eur_to_try"
-                    label="Ortalama EUR/TRY"
-                    rules={[{ required: true, message: 'Lütfen EUR/TRY kurunu girin' }]}
-                  >
-                    <InputNumber 
-                      style={{ width: '100%' }}
-                      min={0}
-                      step={0.0001}
-                      precision={4}
-                    />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row>
-                <Col span={24} style={{ textAlign: 'right' }}>
-                  <Space>
-                    {editingId && (
-                      <Button onClick={handleCancel}>
-                        İptal
-                      </Button>
-                    )}
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      icon={editingId ? <SaveOutlined /> : <PlusOutlined />}
-                      loading={loading}
-                    >
-                      {editingId ? 'Güncelle' : 'Ekle'}
-                    </Button>
-                  </Space>
-                </Col>
-              </Row>
-            </Form>
-          </Card>
-        </Col>
-      </Row>
+          <div className="fx-cur-block usd">
+            <div className="head">
+              <span className="ttl">USD <span className="pair">/ TRY</span></span>
+              <span className="caps">3 örnek alınıp ortalanacak</span>
+            </div>
+            <div className="inputs">
+              <InputNumber className="input-lg" value={usd1} onChange={setUsd1} controls={false} step={0.0001} min={0} decimalSeparator="," />
+              <InputNumber className="input-lg" value={usd2} onChange={setUsd2} controls={false} step={0.0001} min={0} decimalSeparator="," />
+              <InputNumber className="input-lg" value={usd3} onChange={setUsd3} controls={false} step={0.0001} min={0} decimalSeparator="," />
+            </div>
+            <div className="avg">
+              <span className="l">Ortalama · $1 =</span>
+              <span className="v"><span className="cur">₺</span>{usdAvg.toFixed(4).replace('.', ',')}</span>
+            </div>
+          </div>
 
-      <Row gutter={16}>
-        <Col span={24}>
-          <Card title="Kur Listesi">
-            <Spin spinning={loading}>
-              <Table 
-                columns={columns} 
-                dataSource={fxRates} 
-                rowKey="id" 
-                pagination={{ pageSize: 12 }}
-              />
-            </Spin>
-          </Card>
-        </Col>
-      </Row>
+          <div className="fx-cur-block eur">
+            <div className="head">
+              <span className="ttl">EUR <span className="pair">/ TRY</span></span>
+              <span className="caps">3 örnek alınıp ortalanacak</span>
+            </div>
+            <div className="inputs">
+              <InputNumber className="input-lg" value={eur1} onChange={setEur1} controls={false} step={0.0001} min={0} decimalSeparator="," />
+              <InputNumber className="input-lg" value={eur2} onChange={setEur2} controls={false} step={0.0001} min={0} decimalSeparator="," />
+              <InputNumber className="input-lg" value={eur3} onChange={setEur3} controls={false} step={0.0001} min={0} decimalSeparator="," />
+            </div>
+            <div className="avg">
+              <span className="l">Ortalama · €1 =</span>
+              <span className="v"><span className="cur">₺</span>{eurAvg.toFixed(4).replace('.', ',')}</span>
+            </div>
+          </div>
+
+          {affectedCount > 0 && (
+            <div className="fx-note">
+              <InfoCircleOutlined />
+              <span>Kuru güncellediğinizde tüm USD/EUR faturalar yeniden hesaplanır. {MONTHS_TR[month - 1]} ayı için <strong>{affectedCount} fatura</strong> etkilenecek.</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+            <Button onClick={handleReset}>Sıfırla</Button>
+            <Button type="primary" loading={saving} onClick={handleSave}>{isEditing ? 'Kuru Güncelle' : 'Kuru Kaydet'}</Button>
+          </div>
+        </div>
+
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '22px 24px 14px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, margin: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ display: 'inline-block', width: 3, height: 14, borderRadius: 2, background: 'var(--color-primary-600)' }} />
+              Kayıtlı Kurlar
+            </h3>
+            <span className="caps">son 12 ay</span>
+          </div>
+
+          <table className="ti">
+            <thead>
+              <tr>
+                <th style={{ width: 140 }}>Dönem</th>
+                <th className="num">USD / TRY</th>
+                <th className="num">EUR / TRY</th>
+                <th className="num">Fatura</th>
+                <th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedRates.map(rate => {
+                const isActive = rate.year === year && rate.month === month;
+                return (
+                  <tr key={rate.id}>
+                    <td>
+                      <strong style={{ fontWeight: 500 }}>{MONTHS_TR[rate.month - 1]} · {rate.year}</strong>
+                      {isActive && <span style={{ marginLeft: 6, fontSize: 11, color: 'var(--color-primary-600)', fontFamily: 'var(--font-mono)' }}>aktif</span>}
+                    </td>
+                    <td className="num"><span style={{ color: 'var(--cc-usd)', fontWeight: 500 }}>{Number(rate.usd_to_try).toFixed(4).replace('.', ',')}</span></td>
+                    <td className="num"><span style={{ color: 'var(--cc-eur)', fontWeight: 500 }}>{Number(rate.eur_to_try).toFixed(4).replace('.', ',')}</span></td>
+                    <td className="num">{invoiceCounts[`${rate.year}-${rate.month}`] ?? 0}</td>
+                    <td>
+                      <span style={{ display: 'inline-flex', gap: 4 }}>
+                        <span className="tt-icon-btn" onClick={() => handleEdit(rate)} title="Düzenle"><EditOutlined /></span>
+                        <Popconfirm title="Bu kur silinsin mi?" onConfirm={() => handleDelete(rate.id)} okText="Sil" cancelText="İptal">
+                          <span className="tt-icon-btn" title="Sil"><DeleteOutlined /></span>
+                        </Popconfirm>
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 };
 
-export default FxRates; 
+export default FxRates;
