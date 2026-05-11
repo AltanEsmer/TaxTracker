@@ -18,6 +18,20 @@ let mainWindow;
 let tray = null;
 let isQuitting = false;
 
+// Prevent multiple instances — focus the existing window if a second launch happens
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -46,9 +60,9 @@ function createWindow() {
     
   console.log('Loading URL:', startUrl);
 
-  // Hide window instead of closing when user clicks the close button
+  // Hide window instead of closing when user clicks the close button (prod only)
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && !isDev) {
       event.preventDefault();
       mainWindow.hide();
       return false;
