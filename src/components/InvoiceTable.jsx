@@ -102,28 +102,24 @@ function SummaryFooter({ summary }) {
   return (
     <Table.Summary fixed>
       <Table.Summary.Row style={{ background: 'var(--surface-sunken)' }}>
-        <Table.Summary.Cell index={0} colSpan={3}>
-          <span style={{ font: '400 12px "Inter Tight"', color: 'var(--text-secondary)' }}>
-            Filtreli toplam · <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
-              {summary.count} fatura · {summary.period}
-            </strong>
-          </span>
-        </Table.Summary.Cell>
-        <Table.Summary.Cell index={3} align="right">
-          <FooterStat label="Ara Toplam" value={fmtTRY(summary.subtotal)} />
-        </Table.Summary.Cell>
-        <Table.Summary.Cell index={4} align="right">
-          <FooterStat label="KDV" value={fmtTRY(summary.kdv)} />
-        </Table.Summary.Cell>
-        <Table.Summary.Cell index={5} align="right">
-          <FooterStat label="Toplam" value={fmtTRY(summary.total)} size={15} />
-        </Table.Summary.Cell>
-        <Table.Summary.Cell index={6} align="right">
-          <FooterStat
-            label="Net"
-            value={(summary.net >= 0 ? '+ ' : '− ') + fmtTRY(Math.abs(summary.net))}
-            color={summary.net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}
-          />
+        <Table.Summary.Cell index={0} colSpan={8}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+            <span style={{ font: '400 12px "Inter Tight"', color: 'var(--text-secondary)', flex: '1 1 auto', minWidth: 0 }}>
+              Filtreli toplam · <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
+                {summary.count} fatura · {summary.period}
+              </strong>
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 32, flexShrink: 0 }}>
+              <FooterStat label="Ara Toplam" value={fmtTRY(summary.subtotal)} />
+              <FooterStat label="KDV" value={fmtTRY(summary.kdv)} />
+              <FooterStat label="Toplam" value={fmtTRY(summary.total)} size={15} />
+              <FooterStat
+                label="Net"
+                value={(summary.net >= 0 ? '+ ' : '− ') + fmtTRY(Math.abs(summary.net))}
+                color={summary.net >= 0 ? 'var(--color-success)' : 'var(--color-danger)'}
+              />
+            </div>
+          </div>
         </Table.Summary.Cell>
       </Table.Summary.Row>
     </Table.Summary>
