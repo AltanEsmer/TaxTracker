@@ -15,7 +15,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Build & publish
-        run: npm run build
+        run: |
+          npm run react-build
+          npm run postbuild
+          npx electron-builder --config electron-builder.yml --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
