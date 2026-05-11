@@ -1367,15 +1367,24 @@ textarea.input-lg {
 .fx-period { display: flex; gap: 10px; margin-bottom: 24px; }
 
 .fx-cur-block {
-  padding: 18px 20px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
-  background: var(--surface-base);
-  margin-bottom: 14px;
+  padding: 16px 0 18px;
+  border-top: 1px solid var(--border-subtle);
+  position: relative;
+  margin-bottom: 4px;
 }
 
-.fx-cur-block.usd { border-left: 3px solid var(--cc-usd); }
-.fx-cur-block.eur { border-left: 3px solid var(--cc-eur); }
+.fx-cur-block::before {
+  content: "";
+  position: absolute;
+  left: -30px;
+  top: 18px;
+  bottom: 18px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.fx-cur-block.usd::before { background: var(--cc-usd); }
+.fx-cur-block.eur::before { background: var(--cc-eur); }
 
 .fx-cur-block .head {
   display: flex;
