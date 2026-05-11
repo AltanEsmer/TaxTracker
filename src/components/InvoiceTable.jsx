@@ -1,6 +1,6 @@
 // InvoiceTable — premium AntD table for the Faturalar page
 import React from 'react';
-import { Table, Tag } from 'antd';
+import { Table, Tag, Tooltip } from 'antd';
 import { RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
@@ -102,7 +102,7 @@ function SummaryFooter({ summary }) {
   return (
     <Table.Summary fixed>
       <Table.Summary.Row style={{ background: 'var(--surface-sunken)' }}>
-        <Table.Summary.Cell index={0} colSpan={8}>
+        <Table.Summary.Cell index={0} colSpan={9}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
             <span style={{ font: '400 12px "Inter Tight"', color: 'var(--text-secondary)', flex: '1 1 auto', minWidth: 0 }}>
               Filtreli toplam · <strong style={{ fontWeight: 500, color: 'var(--text-primary)' }}>
@@ -140,6 +140,102 @@ export function InvoiceTableEmpty({ onCreate }) {
         Faturalarınızı tek bir yerde toplamaya başlayın. KDV ve TRY karşılıkları otomatik hesaplanır.
       </div>
       <button onClick={onCreate} className="ant-btn ant-btn-primary" style={{ marginTop: 6 }}>+ Yeni Fatura Ekle</button>
+    </div>
+  );
+}
+
+function LineItemsExpansion({ invoice }) {
+  const lines = Array.isArray(invoice.line_items) ? invoice.line_items : [];
+  const tryLines = Array.isArray(invoice.try_equivalent?.line_items)
+    ? invoice.try_equivalent.line_items
+    : null;
+  const dataSource = lines.map((li, idx) => {
+    const tryLi = tryLines?.find((t) => t.id === li.id) || tryLines?.[idx] || null;
+    const subtotal = Number(li.subtotal) || 0;
+    const rate = Number(li.vat_rate) || 0;
+    const vatAmount = subtotal * (rate / 100);
+    return {
+      key: li.id ?? idx,
+      description: li.description || '—',
+      subtotal,
+      vat_rate: rate,
+      vat_amount: vatAmount,
+      line_total: subtotal + vatAmount,
+      try_subtotal: tryLi?.subtotal ?? null,
+      try_vat_amount: tryLi?.vat_amount ?? null,
+    };
+  });
+  const isForeign = invoice.currency !== 'TRY';
+  const columns = [
+    { title: 'Açıklama', dataIndex: 'description', key: 'description' },
+    {
+      title: 'Ara Toplam',
+      dataIndex: 'subtotal',
+      key: 'subtotal',
+      align: 'right',
+      width: 160,
+      render: (v, row) => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <span style={{ font: '500 12.5px "JetBrains Mono"', fontVariantNumeric: 'tabular-nums' }}>
+            {fmtCur(v, invoice.currency)}
+          </span>
+          {isForeign && row.try_subtotal != null && (
+            <span style={{ font: '400 11px "JetBrains Mono"', color: 'var(--text-tertiary)' }}>
+              ≈ {fmtTRY(row.try_subtotal)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'KDV %',
+      dataIndex: 'vat_rate',
+      key: 'vat_rate',
+      align: 'right',
+      width: 80,
+      render: (v) => `%${v}`,
+    },
+    {
+      title: 'KDV Tutarı',
+      dataIndex: 'vat_amount',
+      key: 'vat_amount',
+      align: 'right',
+      width: 160,
+      render: (v, row) => (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+          <span style={{ font: '500 12.5px "JetBrains Mono"', fontVariantNumeric: 'tabular-nums' }}>
+            {fmtCur(v, invoice.currency)}
+          </span>
+          {isForeign && row.try_vat_amount != null && (
+            <span style={{ font: '400 11px "JetBrains Mono"', color: 'var(--text-tertiary)' }}>
+              ≈ {fmtTRY(row.try_vat_amount)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: 'Satır Toplamı',
+      dataIndex: 'line_total',
+      key: 'line_total',
+      align: 'right',
+      width: 160,
+      render: (v) => (
+        <span style={{ font: '500 13px "JetBrains Mono"', fontVariantNumeric: 'tabular-nums' }}>
+          {fmtCur(v, invoice.currency)}
+        </span>
+      ),
+    },
+  ];
+  return (
+    <div style={{ padding: '8px 24px 16px' }}>
+      <Table
+        size="small"
+        pagination={false}
+        columns={columns}
+        dataSource={dataSource}
+        rowClassName={() => 'tt-row-nested'}
+      />
     </div>
   );
 }
@@ -185,13 +281,26 @@ export default function InvoiceTable({ rows, selectedRowKeys, onSelectChange, on
     {
       title: 'KDV %',
       dataIndex: 'vat_rate',
-      width: 80,
+      width: 100,
       align: 'right',
-      render: (v) => (
-        <span style={{ font: '500 13px "JetBrains Mono"', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
-          %{v}
-        </span>
-      ),
+      sorter: (a, b) => (a.vat_rate ?? -1) - (b.vat_rate ?? -1),
+      render: (v, row) => {
+        if (v == null) {
+          const distinct = Array.isArray(row.line_items)
+            ? [...new Set(row.line_items.map((li) => Math.round((Number(li.vat_rate) || 0) * 100) / 100))].sort((a, b) => a - b)
+            : [];
+          return (
+            <Tooltip title={distinct.length ? distinct.map((r) => `%${r}`).join(', ') : 'Karışık KDV oranları'}>
+              <Tag color="gold" style={{ margin: 0 }}>Karışık</Tag>
+            </Tooltip>
+          );
+        }
+        return (
+          <span style={{ font: '500 13px "JetBrains Mono"', color: 'var(--text-secondary)', fontVariantNumeric: 'tabular-nums' }}>
+            %{v}
+          </span>
+        );
+      },
     },
     {
       title: 'Toplam',
@@ -229,6 +338,10 @@ export default function InvoiceTable({ rows, selectedRowKeys, onSelectChange, on
           selectedRowKeys,
           onChange: onSelectChange,
           columnWidth: 36,
+        }}
+        expandable={{
+          rowExpandable: (row) => Array.isArray(row.line_items) && row.line_items.length > 0,
+          expandedRowRender: (row) => <LineItemsExpansion invoice={row} />,
         }}
         onRow={(row) => ({
           onClick: () => onRowClick?.(row),

@@ -1,9 +1,9 @@
-// InvoiceFormMoneyZone — right-column money zone for the Invoice Form
+// InvoiceFormMoneyZone — currency + total + FX zone for the Invoice Form.
+// Subtotal and KDV inputs moved into InvoiceFormLineItems.
 import React, { useMemo } from 'react';
-import { Segmented, InputNumber, Switch } from 'antd';
+import { Segmented, InputNumber, Switch, Tooltip } from 'antd';
 import { SwapOutlined } from '@ant-design/icons';
 
-const DEFAULT_VAT_OPTIONS = [0, 5, 10, 16, 20].map(r => ({ rate: r }));
 const CUR_SYMBOL = { TRY: '₺', USD: '$', EUR: '€' };
 
 const fmt = (n) =>
@@ -12,20 +12,16 @@ const fmt = (n) =>
 export default function InvoiceFormMoneyZone({
   currency,
   onCurrencyChange,
-  subtotal,
-  onSubtotalChange,
-  vatRate,
-  onVatRateChange,
+  computedTotal = 0,
   fxRate,
   fxPeriodLabel = '',
   manualTotal = false,
   manualTotalValue,
   onManualTotalChange,
   onManualToggle,
-  vatOptions = DEFAULT_VAT_OPTIONS,
+  manualTotalAllowed = false,
   fxMissing = false,
 }) {
-  const computedTotal = useMemo(() => subtotal * (1 + vatRate / 100), [subtotal, vatRate]);
   const displayTotal = manualTotal && manualTotalValue != null ? manualTotalValue : computedTotal;
   const tryEquivalent = useMemo(() => displayTotal * (fxRate || 0), [displayTotal, fxRate]);
   const isForeign = currency !== 'TRY';
@@ -33,7 +29,7 @@ export default function InvoiceFormMoneyZone({
 
   return (
     <div className="money-zone">
-      <h3>Tutar</h3>
+      <h3>Tutar & Para Birimi</h3>
 
       <div className="field" style={{ marginBottom: 18 }}>
         <label className="field-label">Para Birimi</label>
@@ -48,50 +44,25 @@ export default function InvoiceFormMoneyZone({
         />
       </div>
 
-      <div className="field" style={{ marginBottom: 18 }}>
-        <label className="field-label">Tutar (KDV hariç)</label>
-        <div className="money-prefix-wrap" data-prefix={sym}>
-          <InputNumber
-            className="money-amount"
-            value={subtotal}
-            onChange={(v) => onSubtotalChange(Number(v) || 0)}
-            controls={false}
-            decimalSeparator=","
-            min={0}
-            step={0.01}
-            disabled={manualTotal}
-            formatter={(v) =>
-              v == null ? '' : Number(v).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-            }
-            parser={(v) => Number(String(v || '').replace(/\./g, '').replace(',', '.')) || 0}
-            style={{ width: '100%' }}
-          />
-        </div>
-      </div>
-
-      <div className="field" style={{ marginBottom: 18 }}>
-        <label className="field-label">KDV Oranı</label>
-        <div className="vat-chips">
-          {vatOptions.map((opt) => (
-            <button
-              key={opt.rate}
-              type="button"
-              title={opt.label || `%${opt.rate} KDV`}
-              className={opt.rate === vatRate ? 'active' : ''}
-              onClick={() => onVatRateChange(opt.rate)}
-            >
-              %{opt.rate}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="field" style={{ marginBottom: 12 }}>
         <label className="field-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>Manuel toplam</span>
-          <Switch size="small" checked={manualTotal} onChange={onManualToggle} />
+          <Tooltip
+            title={
+              manualTotalAllowed
+                ? 'Hesaplanan toplam yerine elle bir değer girin'
+                : 'Manuel toplam yalnızca tek kalemli faturalarda kullanılabilir'
+            }
+          >
+            <Switch
+              size="small"
+              checked={manualTotal}
+              onChange={onManualToggle}
+              disabled={!manualTotalAllowed}
+            />
+          </Tooltip>
         </label>
-        {manualTotal && (
+        {manualTotal && manualTotalAllowed && (
           <div className="money-prefix-wrap" data-prefix={sym}>
             <InputNumber
               className="money-amount"

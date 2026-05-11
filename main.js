@@ -479,8 +479,18 @@ ipcMain.handle('export-to-excel', async (event, data, filePath) => {
     });
 
     // ── Data rows ────────────────────────────────────────────────────────────────
+    // Track which rows have a non-numeric KDV Oranı (the "Karışık" sentinel for mixed-rate
+    // invoices) so we can skip the percent cell format and write them as text instead.
+    const isNumericRate = (val) => {
+      if (typeof val === 'number') return Number.isFinite(val);
+      if (typeof val !== 'string') return false;
+      return val.trim() !== '' && !Number.isNaN(parseFloat(val));
+    };
+
     data.rows.forEach((row, index) => {
       const bg = index % 2 === 0 ? WHITE : LBLUE;
+      const rawRate = row['KDV Oranı'];
+      const rateNumeric = isNumericRate(rawRate);
       const dataRow = worksheet.addRow([
         row['Tarih'],
         row['Fatura Tip'],
@@ -488,7 +498,7 @@ ipcMain.handle('export-to-excel', async (event, data, filePath) => {
         row['Fatura No'],
         row['Para Birim'],
         toNum(row['Ara Toplam']),
-        toNum(row['KDV Oranı']),
+        rateNumeric ? toNum(rawRate) : (rawRate ?? ''),
         toNum(row['KDV Tutar']),
         toNum(row['Genel Toplam']),
         toNum(row['Ara Toplam (TL)']),
@@ -509,8 +519,12 @@ ipcMain.handle('export-to-excel', async (event, data, filePath) => {
           cell.numFmt    = currencyFmt;
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
         } else if (pctCols.includes(col)) {
-          cell.numFmt    = pctFmt;
-          cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          if (rateNumeric) {
+            cell.numFmt    = pctFmt;
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          } else {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' };
+          }
         } else {
           cell.alignment = { horizontal: 'left', vertical: 'middle' };
         }
@@ -545,6 +559,96 @@ ipcMain.handle('export-to-excel', async (event, data, filePath) => {
         cell.alignment = { horizontal: 'left', vertical: 'middle' };
       }
     });
+
+    // ── Optional second sheet: per-line-item ("Kalemler") for multi-rate KDV audits ─
+    if (Array.isArray(data.lineItems) && data.lineItems.length > 0) {
+      const liSheet = workbook.addWorksheet(data.lineItemsSheetName || 'Kalemler', {
+        views: [{ state: 'frozen', ySplit: 2 }],
+      });
+      const liColDefs = [
+        { key: 'Tarih',           width: 14 },
+        { key: 'Fatura No',       width: 16 },
+        { key: 'Şirket',          width: 24 },
+        { key: 'Fatura Tip',      width: 13 },
+        { key: 'Para Birim',      width: 12 },
+        { key: 'Satır Açıklama',  width: 32 },
+        { key: 'Ara Toplam',      width: 15 },
+        { key: 'KDV Oranı',       width: 12 },
+        { key: 'KDV Tutar',       width: 15 },
+        { key: 'Satır Toplamı',   width: 16 },
+        { key: 'Ara Toplam (TL)', width: 18 },
+        { key: 'KDV Tutar (TL)',  width: 18 },
+      ];
+      const liHeaders = [
+        'Tarih', 'Fatura No', 'Şirket', 'Fatura Tip', 'Para Birim',
+        'Satır Açıklama', 'Ara Toplam', 'KDV Oranı (%)', 'KDV Tutar', 'Satır Toplamı',
+        'Ara Toplam (TL)', 'KDV Tutar (TL)',
+      ];
+      const liNumCols = liColDefs.length;
+      const liCurrencyCols = [7, 9, 10, 11, 12];
+      const liPctCols = [8];
+
+      const liTitleRow = liSheet.addRow([`FATURA KALEMLERİ — ${exportDate}`]);
+      liTitleRow.height = 30;
+      liSheet.mergeCells(1, 1, 1, liNumCols);
+      const liTitleCell = liTitleRow.getCell(1);
+      liTitleCell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+      liTitleCell.font      = { bold: true, size: 14, color: { argb: WHITE }, name: 'Calibri' };
+      liTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      liSheet.columns = liColDefs;
+      const liHeaderRow = liSheet.addRow(liHeaders);
+      liHeaderRow.height = 22;
+      liHeaderRow.eachCell({ includeEmpty: true }, (cell) => {
+        cell.fill      = { type: 'pattern', pattern: 'solid', fgColor: { argb: BLUE } };
+        cell.font      = { bold: true, size: 10, color: { argb: WHITE }, name: 'Calibri' };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+        cell.border    = {
+          top:    { style: 'medium', color: { argb: NAVY } },
+          left:   { style: 'thin',   color: { argb: NAVY_BORDER } },
+          bottom: { style: 'medium', color: { argb: NAVY } },
+          right:  { style: 'thin',   color: { argb: NAVY_BORDER } },
+        };
+      });
+
+      data.lineItems.forEach((row, index) => {
+        const bg = index % 2 === 0 ? WHITE : LBLUE;
+        const lineRow = liSheet.addRow([
+          row['Tarih'],
+          row['Fatura No'],
+          row['Şirket'],
+          row['Fatura Tip'],
+          row['Para Birim'],
+          row['Satır Açıklama'],
+          toNum(row['Ara Toplam']),
+          toNum(row['KDV Oranı']),
+          toNum(row['KDV Tutar']),
+          toNum(row['Satır Toplamı']),
+          toNum(row['Ara Toplam (TL)']),
+          toNum(row['KDV Tutar (TL)']),
+        ]);
+        lineRow.height = 18;
+        lineRow.eachCell({ includeEmpty: true }, (cell, col) => {
+          cell.fill   = { type: 'pattern', pattern: 'solid', fgColor: { argb: bg } };
+          cell.font   = { size: 10, name: 'Calibri', color: { argb: BLACK } };
+          cell.border = {
+            top:    { style: 'thin', color: { argb: LIGHT_BORDER } },
+            left:   { style: 'thin', color: { argb: LIGHT_BORDER } },
+            bottom: { style: 'thin', color: { argb: LIGHT_BORDER } },
+            right:  { style: 'thin', color: { argb: LIGHT_BORDER } },
+          };
+          if (liCurrencyCols.includes(col)) {
+            cell.numFmt    = currencyFmt;
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          } else if (liPctCols.includes(col)) {
+            cell.numFmt    = pctFmt;
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+          } else {
+            cell.alignment = { horizontal: 'left', vertical: 'middle' };
+          }
+        });
+      });
+    }
 
     await workbook.xlsx.writeFile(filePath);
     return true;

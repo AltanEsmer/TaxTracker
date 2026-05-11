@@ -70,7 +70,53 @@ class DatabaseManager {
           }
           return invoice;
         });
-        
+
+        // Migration: synthesize a single line_items entry from legacy single-rate invoices,
+        // then always re-derive invoice-level aggregates from line_items (idempotent, self-healing).
+        this.invoices = this.invoices.map(invoice => {
+          let lineItems = Array.isArray(invoice.line_items) ? invoice.line_items : null;
+          if (!lineItems || lineItems.length === 0) {
+            const subtotal = Number(invoice.subtotal) || 0;
+            const vatRate = Number(invoice.vat_rate) || 0;
+            lineItems = [{
+              id: 1,
+              description: invoice.description || '',
+              subtotal,
+              vat_rate: vatRate,
+              vat_amount: subtotal * (vatRate / 100),
+            }];
+          } else {
+            // Ensure every existing line has an id and normalized numeric fields
+            lineItems = lineItems.map((li, idx) => {
+              const subtotal = Number(li.subtotal) || 0;
+              const vatRate = Number(li.vat_rate) || 0;
+              return {
+                id: Number.isFinite(li.id) ? li.id : idx + 1,
+                description: li.description || '',
+                subtotal,
+                vat_rate: vatRate,
+                vat_amount: Number.isFinite(li.vat_amount) ? li.vat_amount : subtotal * (vatRate / 100),
+              };
+            });
+          }
+          const totals = this._computeInvoiceTotals(lineItems);
+          // Preserve any pre-existing manual `total` override only for single-line invoices
+          // where the stored total differs from the derived total (legacy edge case).
+          const storedTotal = Number(invoice.total);
+          const preserveManual =
+            lineItems.length === 1 &&
+            Number.isFinite(storedTotal) &&
+            Math.abs(storedTotal - totals.total) > 0.005;
+          return {
+            ...invoice,
+            line_items: lineItems,
+            subtotal: totals.subtotal,
+            vat_amount: totals.vat_amount,
+            vat_rate: totals.vat_rate,
+            total: preserveManual ? storedTotal : totals.total,
+          };
+        });
+
         this.saveInvoices();
       } else {
         this.invoices = [];
@@ -214,7 +260,15 @@ class DatabaseManager {
         currency: 'TRY',
         invoice_type: 'Alış',
         description: 'Örnek fatura',
-        try_equivalent: { subtotal, vat_amount: vatAmount, total }
+        line_items: [
+          { id: 1, description: 'Örnek ürün', subtotal, vat_rate: vatRate, vat_amount: vatAmount },
+        ],
+        try_equivalent: {
+          subtotal,
+          vat_amount: vatAmount,
+          total,
+          line_items: [{ id: 1, subtotal, vat_amount: vatAmount }],
+        },
       };
       
       this.invoices.push(sampleInvoice);
@@ -254,8 +308,9 @@ class DatabaseManager {
     if (!isFinite(invoice.subtotal) || invoice.subtotal < 0) {
       throw new Error('Invoice subtotal must be a finite number >= 0');
     }
-    if (!isFinite(invoice.vat_rate) || invoice.vat_rate < 0) {
-      throw new Error('Invoice vat_rate must be a finite number >= 0');
+    // vat_rate may be `null` when an invoice has lines at different KDV rates (mixed/"Karışık")
+    if (invoice.vat_rate !== null && (!isFinite(invoice.vat_rate) || invoice.vat_rate < 0)) {
+      throw new Error('Invoice vat_rate must be a finite number >= 0 or null (mixed rates)');
     }
     if (!isFinite(invoice.total) || invoice.total < 0) {
       throw new Error('Invoice total must be a finite number >= 0');
@@ -263,6 +318,20 @@ class DatabaseManager {
     if (!['Alış', 'Satış'].includes(invoice.invoice_type)) {
       throw new Error("Invoice invoice_type must be one of 'Alış', 'Satış'");
     }
+    if (!Array.isArray(invoice.line_items) || invoice.line_items.length === 0) {
+      throw new Error('Invoice must contain at least one line item');
+    }
+    invoice.line_items.forEach((li, idx) => {
+      if (li.description !== undefined && li.description !== null && typeof li.description !== 'string') {
+        throw new Error(`Line item ${idx + 1} description must be a string`);
+      }
+      if (!isFinite(li.subtotal) || li.subtotal < 0) {
+        throw new Error(`Line item ${idx + 1} subtotal must be a finite number >= 0`);
+      }
+      if (!isFinite(li.vat_rate) || li.vat_rate < 0) {
+        throw new Error(`Line item ${idx + 1} vat_rate must be a finite number >= 0`);
+      }
+    });
   }
 
   _validateFxRate(fxRate) {
@@ -337,24 +406,75 @@ class DatabaseManager {
     return invoice || null;
   }
 
+  // Normalize an incoming invoice payload: synthesize a single line from flat fields if
+  // line_items is missing, assign per-line ids, and recompute invoice-level aggregates from
+  // the line items so cached fields are always trustworthy.
+  _normalizeInvoicePayload(invoice) {
+    const allowManualTotal =
+      Array.isArray(invoice.line_items) &&
+      invoice.line_items.length === 1 &&
+      Number.isFinite(Number(invoice.total));
+    const manualTotal = allowManualTotal ? Number(invoice.total) : null;
+
+    let lineItems = Array.isArray(invoice.line_items) ? invoice.line_items : null;
+    if (!lineItems || lineItems.length === 0) {
+      const subtotal = Number(invoice.subtotal) || 0;
+      const vatRate = Number(invoice.vat_rate) || 0;
+      lineItems = [{
+        id: 1,
+        description: invoice.description || '',
+        subtotal,
+        vat_rate: vatRate,
+        vat_amount: subtotal * (vatRate / 100),
+      }];
+    } else {
+      lineItems = lineItems.map((li, idx) => {
+        const subtotal = Number(li.subtotal) || 0;
+        const vatRate = Number(li.vat_rate) || 0;
+        return {
+          id: idx + 1,
+          description: li.description || '',
+          subtotal,
+          vat_rate: vatRate,
+          vat_amount: subtotal * (vatRate / 100),
+        };
+      });
+    }
+
+    const totals = this._computeInvoiceTotals(lineItems);
+    // Preserve a manual total override only when the invoice has a single line — keeps the
+    // legacy "round up the total by a few kuruş" workflow working without breaking the
+    // sum-of-lines invariant for multi-line invoices.
+    const preserveManual =
+      manualTotal !== null &&
+      lineItems.length === 1 &&
+      Math.abs(manualTotal - totals.total) > 0.005;
+
+    return {
+      ...invoice,
+      line_items: lineItems,
+      subtotal: totals.subtotal,
+      vat_amount: totals.vat_amount,
+      vat_rate: totals.vat_rate,
+      total: preserveManual ? manualTotal : totals.total,
+      invoice_type: invoice.invoice_type || 'Alış',
+    };
+  }
+
   addInvoice(invoice) {
     try {
-      this._validateInvoice(invoice);
-      const id = this.invoices.length > 0 
-        ? Math.max(...this.invoices.map(inv => inv.id)) + 1 
+      const normalized = this._normalizeInvoicePayload(invoice);
+      this._validateInvoice(normalized);
+      const id = this.invoices.length > 0
+        ? Math.max(...this.invoices.map(inv => inv.id)) + 1
         : 1;
-      
-      // Ensure invoice_type is set, default to 'Alış' if not provided
-      const newInvoice = {
-        id,
-        ...invoice,
-        invoice_type: invoice.invoice_type || 'Alış'
-      };
+
+      const newInvoice = { id, ...normalized };
       newInvoice.try_equivalent = this._computeTryEquivalent(newInvoice);
 
       this.invoices.push(newInvoice);
       this.saveInvoices();
-      
+
       return newInvoice;
     } catch (error) {
       console.error('Error adding invoice:', error);
@@ -364,15 +484,12 @@ class DatabaseManager {
 
   updateInvoice(id, invoice) {
     try {
-      this._validateInvoice(invoice);
+      const normalized = this._normalizeInvoicePayload(invoice);
+      this._validateInvoice(normalized);
       const index = this.invoices.findIndex(inv => inv.id === Number(id));
-      
+
       if (index !== -1) {
-        this.invoices[index] = {
-          id: Number(id),
-          ...invoice,
-          invoice_type: invoice.invoice_type || 'Alış'
-        };
+        this.invoices[index] = { id: Number(id), ...normalized };
         this.invoices[index].try_equivalent = this._computeTryEquivalent(this.invoices[index]);
         this.saveInvoices();
         return this.invoices[index];
@@ -402,12 +519,44 @@ class DatabaseManager {
     }
   }
 
+  // Aggregate a line_items array into invoice-level totals. `vat_rate` is the single shared
+  // rate (when all lines agree, rounded to 2 dp) or `null` for mixed-rate ("Karışık") invoices.
+  _computeInvoiceTotals(lineItems) {
+    let subtotal = 0;
+    let vatAmount = 0;
+    const rateSet = new Set();
+    for (const li of lineItems) {
+      const liSubtotal = Number(li.subtotal) || 0;
+      const liRate = Number(li.vat_rate) || 0;
+      subtotal += liSubtotal;
+      vatAmount += liSubtotal * (liRate / 100);
+      rateSet.add(Math.round(liRate * 100) / 100);
+    }
+    const vatRate = rateSet.size === 1 ? [...rateSet][0] : null;
+    return {
+      subtotal,
+      vat_amount: vatAmount,
+      total: subtotal + vatAmount,
+      vat_rate: vatRate,
+    };
+  }
+
   _computeTryEquivalent(invoice) {
+    const lineItems = Array.isArray(invoice.line_items) ? invoice.line_items : [];
+
     if (invoice.currency === 'TRY') {
       return {
         subtotal: invoice.subtotal,
-        vat_amount: invoice.subtotal * (invoice.vat_rate / 100),
+        vat_amount: lineItems.reduce(
+          (acc, li) => acc + (Number(li.subtotal) || 0) * ((Number(li.vat_rate) || 0) / 100),
+          0,
+        ),
         total: invoice.total,
+        line_items: lineItems.map(li => ({
+          id: li.id,
+          subtotal: Number(li.subtotal) || 0,
+          vat_amount: (Number(li.subtotal) || 0) * ((Number(li.vat_rate) || 0) / 100),
+        })),
       };
     }
     const d = new Date(invoice.date);
@@ -417,11 +566,24 @@ class DatabaseManager {
     if (invoice.currency === 'USD' && fx.usd_to_try) rate = fx.usd_to_try;
     else if (invoice.currency === 'EUR' && fx.eur_to_try) rate = fx.eur_to_try;
     if (!rate) return null;
+    const totalVatInForeign = lineItems.reduce(
+      (acc, li) => acc + (Number(li.subtotal) || 0) * ((Number(li.vat_rate) || 0) / 100),
+      0,
+    );
     return {
       subtotal: invoice.subtotal * rate,
-      vat_amount: (invoice.subtotal * (invoice.vat_rate / 100)) * rate,
+      vat_amount: totalVatInForeign * rate,
       total: invoice.total * rate,
       rate,
+      line_items: lineItems.map(li => {
+        const liSubtotal = Number(li.subtotal) || 0;
+        const liVat = liSubtotal * ((Number(li.vat_rate) || 0) / 100);
+        return {
+          id: li.id,
+          subtotal: liSubtotal * rate,
+          vat_amount: liVat * rate,
+        };
+      }),
     };
   }
 
@@ -654,7 +816,7 @@ class DatabaseManager {
         }
         
         const entry = monthCurrencyTypeMap.get(key);
-        entry.vat_amount += invoice.subtotal * (invoice.vat_rate / 100);
+        entry.vat_amount += Number(invoice.vat_amount) || 0;
         entry.invoice_count += 1;
       });
       
