@@ -4,6 +4,12 @@ const isDev = !app.isPackaged;
 const fs = require('fs');
 const DatabaseManager = require('./database');
 const ExcelJS = require('exceljs');
+const { autoUpdater } = require('electron-updater');
+const log = require('electron-log');
+autoUpdater.logger = log;
+autoUpdater.logger.transports.file.level = 'info';
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 // Initialize the database
 const db = new DatabaseManager();
@@ -191,10 +197,28 @@ app.whenReady().then(() => {
   } catch (error) {
     console.error('Failed to initialize database:', error);
   }
-  
+
+  if (!isDev) {
+    autoUpdater.checkForUpdatesAndNotify().catch(err => log.error('updater:', err));
+  }
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+autoUpdater.on('update-downloaded', async () => {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    buttons: ['Şimdi Yeniden Başlat', 'Daha Sonra'],
+    defaultId: 0,
+    title: 'Güncelleme Hazır',
+    message: 'Yeni bir sürüm indirildi. Uygulamayı yeniden başlatmak ister misiniz?',
+  });
+  if (response === 0) {
+    isQuitting = true;
+    autoUpdater.quitAndInstall();
+  }
 });
 
 // Handle the 'before-quit' event to allow the app to quit properly
@@ -316,6 +340,38 @@ ipcMain.handle('delete-fx-rate', async (event, id) => {
     console.error('Error in delete-fx-rate:', error);
     throw error;
   }
+});
+
+ipcMain.handle('get-kdv-rates', async () => {
+  try { return db.getKdvRates(); }
+  catch (error) { console.error('Error in get-kdv-rates:', error); throw error; }
+});
+
+ipcMain.handle('add-kdv-rate', async (event, rate) => {
+  try {
+    if (!rate || typeof rate !== 'object') throw new Error('Invalid KDV rate data');
+    return db.addKdvRate(rate);
+  } catch (error) { console.error('Error in add-kdv-rate:', error); throw error; }
+});
+
+ipcMain.handle('update-kdv-rate', async (event, id, rate) => {
+  try {
+    if (id === undefined || id === null) throw new Error('KDV rate ID is required');
+    if (!rate || typeof rate !== 'object') throw new Error('Invalid KDV rate data');
+    return db.updateKdvRate(id, rate);
+  } catch (error) { console.error('Error in update-kdv-rate:', error); throw error; }
+});
+
+ipcMain.handle('delete-kdv-rate', async (event, id) => {
+  try {
+    if (id === undefined || id === null) throw new Error('KDV rate ID is required');
+    return db.deleteKdvRate(id);
+  } catch (error) { console.error('Error in delete-kdv-rate:', error); throw error; }
+});
+
+ipcMain.handle('check-for-updates', async () => {
+  if (isDev) return { dev: true };
+  return autoUpdater.checkForUpdates();
 });
 
 ipcMain.handle('show-save-dialog', async (event, options) => {

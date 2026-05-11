@@ -8,6 +8,7 @@ import {
   UnorderedListOutlined,
   PlusOutlined,
   SwapOutlined,
+  SettingOutlined,
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
@@ -16,6 +17,7 @@ import Dashboard from './pages/Dashboard';
 import InvoiceList from './pages/InvoiceList';
 import InvoiceForm from './pages/InvoiceForm';
 import FxRates from './pages/FxRates';
+import KdvSettings from './pages/KdvSettings';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 const { Sider, Header, Content } = Layout;
@@ -39,6 +41,7 @@ function getSelectedKey(pathname) {
   if (pathname.startsWith('/invoices/edit')) return '/invoices';
   if (pathname.startsWith('/invoices'))      return '/invoices';
   if (pathname.startsWith('/fx-rates'))      return '/fx-rates';
+  if (pathname.startsWith('/kdv-rates'))     return '/kdv-rates';
   return '/';
 }
 
@@ -48,6 +51,7 @@ const TITLE_MAP = [
   { match: '/invoices/edit', title: 'Fatura Düzenle', crumb: ['Faturalar', 'Fatura Düzenle'] },
   { match: '/invoices',      title: 'Faturalar',      crumb: ['Genel', 'Faturalar'] },
   { match: '/fx-rates',      title: 'Kur Yönetimi',  crumb: ['Genel', 'Kur Yönetimi'] },
+  { match: '/kdv-rates',     title: 'KDV Oranları',   crumb: ['Genel', 'KDV Oranları'] },
   { match: '/',              title: 'Dashboard',      crumb: ['Genel', 'Dashboard'] },
 ];
 
@@ -66,6 +70,7 @@ function AppSider({ themeMode, onToggleTheme, invoiceCount }) {
     { key: '/invoices',     label: 'Faturalar',    icon: <UnorderedListOutlined />, count: invoiceCount },
     { key: '/invoices/new', label: 'Yeni Fatura',  icon: <PlusOutlined />,          count: null },
     { key: '/fx-rates',     label: 'Kur Yönetimi', icon: <SwapOutlined />,          count: null },
+    { key: '/kdv-rates',    label: 'KDV Oranları', icon: <SettingOutlined />,       count: null },
   ];
 
   return (
@@ -216,6 +221,7 @@ function App() {
                     <Route path="/invoices/new"        element={<InvoiceForm />} />
                     <Route path="/invoices/edit/:id"   element={<InvoiceForm />} />
                     <Route path="/fx-rates"            element={<FxRates />} />
+                    <Route path="/kdv-rates"           element={<KdvSettings />} />
                   </Routes>
                 </ErrorBoundary>
               </TopBarContext.Provider>
