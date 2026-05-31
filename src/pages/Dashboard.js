@@ -1,180 +1,725 @@
-// Dashboard — Quiet Premium redesign (Slice 1)
-import { useContext, useEffect, useState, useMemo } from 'react';
-import { Spin, Alert, Button } from 'antd';
-import { DownloadOutlined, PlusOutlined, CalendarOutlined, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
+import React, { useState, useEffect } from 'react';
+import { 
+  Row, 
+  Col, 
+  Card, 
+  Statistic, 
+  DatePicker, 
+  Typography, 
+  Spin, 
+  Alert,
+  Tabs,
+  Tag,
+  Button
+} from 'antd';
+import { 
+  DollarOutlined, 
+  FileOutlined, 
+  PercentageOutlined,
+  RiseOutlined,
+  FallOutlined,
+  SwapOutlined,
+  TrophyOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { useNavigate } from 'react-router-dom';
-import { HeroKpi, VatBarChart } from '../components/DashboardHero';
-import { TopBarContext } from '../App';
+import { Bar, Pie, Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+} from 'chart.js';
 
-const MONTH_LABELS = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
-function currencySymbol(cur) {
-  if (cur === 'USD') return '$';
-  if (cur === 'EUR') return '€';
-  return '₺';
-}
+// Style guide chart color constants
+const PURCHASE_COLORS = {
+  TRY: '#2563EB',   // Blue
+  USD: '#0891B2',   // Cyan
+  EUR: '#7C3AED',   // Violet
+};
 
-function getTryTotal(inv) {
-  if (inv.try_equivalent && inv.try_equivalent.total) return Number(inv.try_equivalent.total);
-  if (inv.currency === 'TRY') return Number(inv.total || 0);
-  return 0;
-}
+const SALES_COLORS = {
+  TRY: '#16A34A',   // Green
+  USD: '#D97706',   // Amber
+  EUR: '#DC2626',   // Red
+};
 
-function getTryVat(inv) {
-  if (inv.try_equivalent && inv.try_equivalent.vat_amount) return Number(inv.try_equivalent.vat_amount);
-  if (inv.currency === 'TRY') return Number(inv.vat_amount || 0);
-  return 0;
-}
+const { RangePicker } = DatePicker;
+const { Title: TitleText } = Typography;
 
-function buildLast12MonthsBuckets(rawInvoices) {
-  const now = dayjs();
-  const buckets = Array.from({ length: 12 }, (_, i) => {
-    const m = now.subtract(11 - i, 'month');
-    return { year: m.year(), month: m.month() + 1, label: MONTH_LABELS[m.month()], vat: 0, purchases: 0, sales: 0 };
-  });
-
-  rawInvoices.forEach((inv) => {
-    const d = dayjs(inv.date);
-    const idx = buckets.findIndex((b) => b.year === d.year() && b.month === d.month() + 1);
-    if (idx === -1) return;
-    const vat = getTryVat(inv);
-    const total = getTryTotal(inv);
-    buckets[idx].vat += vat;
-    if (inv.invoice_type === 'Alış') buckets[idx].purchases += total;
-    else buckets[idx].sales += total;
-  });
-
-  return buckets;
-}
-
-function buildSpark8(buckets, field) {
-  const last8 = buckets.slice(-8);
-  return last8.map((b) => b[field]);
-}
-
-export default function Dashboard() {
-  const navigate = useNavigate();
-  const { setRight } = useContext(TopBarContext);
-
+const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [rawInvoices, setRawInvoices] = useState([]);
+  const [dashboardData, setDashboardData] = useState(null);
+  
+  // Helper functions for localStorage
+  const saveFiltersToStorage = (dateRange, activeType) => {
+    try {
+      localStorage.setItem('dashboardFilters', JSON.stringify({
+        dateRange: {
+          start: dateRange[0].format('YYYY-MM-DD'),
+          end: dateRange[1].format('YYYY-MM-DD')
+        },
+        activeType
+      }));
+    } catch (error) {
+    }
+  };
 
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const loadFiltersFromStorage = () => {
+    try {
+      const saved = localStorage.getItem('dashboardFilters');
+      if (saved) {
+        const filters = JSON.parse(saved);
+        return {
+          dateRange: [
+            dayjs(filters.dateRange.start),
+            dayjs(filters.dateRange.end)
+          ],
+          activeType: filters.activeType || 'Tümü'
+        };
+      }
+    } catch (error) {
+    }
+    return null;
+  };
 
-  useEffect(() => {
-    setRight(
-      <>
-        <span className="pill-filter"><CalendarOutlined />{dayjs().format('MMMM YYYY')}</span>
-        <Button icon={<DownloadOutlined />}>Excel'e Aktar</Button>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/invoices/new')}>Yeni Fatura</Button>
-      </>
-    );
-    return () => setRight(null);
-  }, [setRight, navigate]);
+  const resetFiltersToCurrentMonth = () => {
+    const currentMonthRange = [
+      dayjs().startOf('month'),
+      dayjs().endOf('month')
+    ];
+    setDateRange(currentMonthRange);
+    setActiveType('Tümü');
+    localStorage.removeItem('dashboardFilters');
+  };
+
+  // Initialize state with localStorage values if available
+  const savedFilters = loadFiltersFromStorage();
+  const [dateRange, setDateRange] = useState(
+    savedFilters ? savedFilters.dateRange : [
+      dayjs().startOf('month'),
+      dayjs().endOf('month')
+    ]
+  );
+  const [activeType, setActiveType] = useState(savedFilters ? savedFilters.activeType : 'Tümü');
 
   useEffect(() => {
     if (!window.api) {
-      setError('Uygulama başlatılamadı: window.api bulunamadı.');
+      setError('Uygulama başlatılamadı: window.api bulunamadı. Lütfen uygulamayı masaüstü kısayolundan başlatın veya destek alın.');
       setLoading(false);
       return;
     }
-    const filters = {
-      startDate: dayjs().subtract(11, 'month').startOf('month').format('YYYY-MM-DD'),
-      endDate: dayjs().endOf('month').format('YYYY-MM-DD'),
-    };
-    window.api.getDashboardData(filters)
-      .then((data) => {
-        const invoices = (data && data.rawInvoices) ? data.rawInvoices : [];
-        setRawInvoices(invoices);
-        setError(null);
-      })
-      .catch((err) => {
-        setError('Veri yüklenirken bir hata oluştu: ' + err.message);
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    fetchDashboardData();
+  }, [dateRange, activeType]);
 
-  const buckets = useMemo(() => buildLast12MonthsBuckets(rawInvoices), [rawInvoices]);
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const filters = {
+        startDate: dateRange[0].format('YYYY-MM-DD'),
+        endDate: dateRange[1].format('YYYY-MM-DD')
+      };
+      
+      const data = await window.api.getDashboardData(filters);
+      
+      
+      // Validate data structure
+      if (!data) {
+        throw new Error('No data received from API');
+      }
+      
+      // Ensure all required arrays exist
+      const validatedData = {
+        vatByMonth: data.vatByMonth || [],
+        currencyDistribution: data.currencyDistribution || [],
+        monthlyTotals: data.monthlyTotals || [],
+        rawInvoices: data.rawInvoices || [] // Added rawInvoices for new calculation logic
+      };
+      
+      setDashboardData(validatedData);
+      setError(null);
+    } catch (err) {
+      setError('Veri yüklenirken bir hata oluştu: ' + err.message);
+      setDashboardData(null);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const currentMonth = dayjs().month() + 1;
-  const currentYear = dayjs().year();
-  const prevMonthD = dayjs().subtract(1, 'month');
+  const handleDateRangeChange = (dates) => {
+    if (dates && dates.length === 2) {
+      setDateRange(dates);
+      saveFiltersToStorage(dates, activeType);
+    }
+  };
 
-  const currentBucket = buckets.find((b) => b.year === currentYear && b.month === currentMonth) || { vat: 0, purchases: 0, sales: 0 };
-  const prevBucket = buckets.find((b) => b.year === prevMonthD.year() && b.month === prevMonthD.month() + 1) || { vat: 0, purchases: 0, sales: 0 };
+  // Prepare chart data
+  const prepareVatByMonthChart = (type) => {
+    if (!dashboardData || !dashboardData.vatByMonth || dashboardData.vatByMonth.length === 0) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+    let data = dashboardData.vatByMonth;
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
+    }
+    
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'KDV',
+          data: [0],
+          backgroundColor: '#CBD5E1'
+        }]
+      };
+    }
+    
+    // Group by month and invoice type
+    const monthGroups = data.reduce((acc, item) => {
+      if (!acc[item.month]) {
+        acc[item.month] = [];
+      }
+      acc[item.month].push(item);
+      return acc;
+    }, {});
 
-  const vatSpark = buckets.map((b) => b.vat);
-  const purchaseSpark8 = buildSpark8(buckets, 'purchases');
-  const salesSpark8 = buildSpark8(buckets, 'sales');
-  const profitSpark8 = salesSpark8.map((s, i) => s - purchaseSpark8[i]);
-
-  const totalInvoices = rawInvoices.length;
-  const prevMonthInvoices = rawInvoices.filter((inv) => {
-    const d = dayjs(inv.date);
-    return d.year() === prevMonthD.year() && d.month() + 1 === prevMonthD.month() + 1;
-  }).length;
-  const currentMonthInvoices = rawInvoices.filter((inv) => {
-    const d = dayjs(inv.date);
-    return d.year() === currentYear && d.month() + 1 === currentMonth;
-  }).length;
-
-  const invoicesDelta = currentMonthInvoices - prevMonthInvoices;
-
-  const purchasesTotal = rawInvoices
-    .filter((inv) => inv.invoice_type === 'Alış')
-    .reduce((s, inv) => s + getTryTotal(inv), 0);
-  const salesTotal = rawInvoices
-    .filter((inv) => inv.invoice_type === 'Satış')
-    .reduce((s, inv) => s + getTryTotal(inv), 0);
-  const profitLoss = salesTotal - purchasesTotal;
-  const profitUp = profitLoss >= 0;
-
-  const topCompanies = useMemo(() => {
-    const map = {};
-    rawInvoices.forEach((inv) => {
-      if (!map[inv.company]) map[inv.company] = 0;
-      map[inv.company] += getTryTotal(inv);
+    const labels = Object.keys(monthGroups).sort();
+    
+    // Create datasets for each currency and invoice type
+    const datasets = [];
+    
+    // Get unique combinations of currency and invoice type
+    const currencyTypeSet = new Set();
+    data.forEach(item => {
+      currencyTypeSet.add(`${item.currency}-${item.invoice_type || 'Alış'}`);
     });
-    const sorted = Object.entries(map)
+    
+    const currencyTypes = Array.from(currencyTypeSet);
+    
+    currencyTypes.forEach((currencyType, index) => {
+      const [currency, type] = currencyType.split('-');
+      
+      // Choose color based on invoice type and currency
+      const colorMap = type === 'Alış' ? PURCHASE_COLORS : SALES_COLORS;
+      const backgroundColor = colorMap[currency] || colorMap['TRY'];
+      
+      datasets.push({
+        label: `KDV (${currency} - ${type})`,
+        data: labels.map(month => {
+          const items = monthGroups[month].filter(item => 
+            item.currency === currency && (item.invoice_type || 'Alış') === type
+          );
+          return items.length > 0 ? items[0].vat_amount : 0;
+        }),
+        backgroundColor
+      });
+    });
+
+    return {
+      labels,
+      datasets
+    };
+  };
+
+  const prepareCurrencyDistributionChart = (type) => {
+    if (!dashboardData || !dashboardData.currencyDistribution || dashboardData.currencyDistribution.length === 0) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+    let data = dashboardData.currencyDistribution;
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
+    }
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'Dağılım',
+          data: [1],
+          backgroundColor: ['#CBD5E1'],
+          borderColor: ['#CBD5E1']
+        }]
+      };
+    }
+    
+    // Group by invoice type
+    const typeGroups = data.reduce((acc, item) => {
+      const type = item.invoice_type || 'Alış';
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(item);
+      return acc;
+    }, {});
+
+    const datasets = [];
+    
+    // Process each invoice type
+    Object.entries(typeGroups).forEach(([type, items]) => {
+      const colors = type === 'Alış' ? PURCHASE_COLORS : SALES_COLORS;
+      const colorValues = Object.values(colors);
+      const backgroundColor = colorValues;
+      const borderColor = colorValues;
+      
+      datasets.push({
+        label: type,
+        data: items.map(item => item.count),
+        backgroundColor,
+        borderColor,
+        borderWidth: 1,
+      });
+    });
+
+    // Get all unique currencies
+    const labels = [...new Set(data.map(item => item.currency))];
+
+    return {
+      labels,
+      datasets
+    };
+  };
+
+  const prepareMonthlyTotalsChart = (type) => {
+    if (!dashboardData || !dashboardData.monthlyTotals || dashboardData.monthlyTotals.length === 0) {
+      return {
+        labels: [],
+        datasets: []
+      };
+    }
+    let data = dashboardData.monthlyTotals;
+    if (type !== 'Tümü') {
+      data = data.filter(item => (item.invoice_type || 'Alış') === type);
+    }
+    
+    // If no data after filtering, return empty chart
+    if (data.length === 0) {
+      return {
+        labels: ['Veri Yok'],
+        datasets: [{
+          label: 'Toplam',
+          data: [0],
+          borderColor: '#CBD5E1',
+          backgroundColor: '#E2E8F0',
+          tension: 0.4,
+        }]
+      };
+    }
+    
+    // Group by invoice type
+    const typeGroups = data.reduce((acc, item) => {
+      const type = item.invoice_type || 'Alış';
+      if (!acc[type]) {
+        acc[type] = [];
+      }
+      acc[type].push(item);
+      return acc;
+    }, {});
+
+    // Get all unique months
+    const allMonths = [...new Set(data.map(item => item.month))].sort();
+
+    const datasets = [];
+    
+    // Create dataset for each invoice type
+    Object.entries(typeGroups).forEach(([type, items]) => {
+      const color = type === 'Alış' ? PURCHASE_COLORS.TRY : SALES_COLORS.TRY;
+      const backgroundColor = type === 'Alış' ? PURCHASE_COLORS.TRY + '33' : SALES_COLORS.TRY + '33';
+      
+      // Create a map of month to amount for this type
+      const monthToAmount = items.reduce((acc, item) => {
+        acc[item.month] = item.total_amount;
+        return acc;
+      }, {});
+      
+      datasets.push({
+        label: `${type} Toplam`,
+        data: allMonths.map(month => monthToAmount[month] || 0),
+        borderColor: color,
+        backgroundColor: backgroundColor,
+        tension: 0.4,
+      });
+    });
+
+    return {
+      labels: allMonths,
+      datasets
+    };
+  };
+
+  // Calculate summary statistics
+  // These functions now match the Faturalar page logic: they sum over the filtered data for the selected date range and type.
+  const calculateTotalVat = (type = null) => {
+    if (!dashboardData || !dashboardData.rawInvoices) return '0.00';
+    let filteredData = dashboardData.rawInvoices;
+    if (type) {
+      filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
+    }
+    const total = filteredData.reduce((sum, item) => {
+      const vatAmount = Number(item.try_equivalent?.vat_amount || item.vat_amount) || 0;
+      return sum + vatAmount;
+    }, 0);
+    return (typeof total === 'number' ? total.toFixed(2) : '0.00');
+  };
+
+  const calculateTotalAmount = (type = null) => {
+    if (!dashboardData || !dashboardData.rawInvoices) return '0.00';
+    let filteredData = dashboardData.rawInvoices;
+    if (type) {
+      filteredData = filteredData.filter(item => (item.invoice_type || 'Alış') === type);
+    }
+    const total = filteredData.reduce((sum, item) => {
+      const amount = Number(item.try_equivalent?.total || item.total) || 0;
+      return sum + amount;
+    }, 0);
+    return (typeof total === 'number' ? total.toFixed(2) : '0.00');
+  };
+
+  // Calculate profit/loss (Sales - Purchases)
+  const calculateProfitLoss = () => {
+    if (!dashboardData || !dashboardData.rawInvoices) return 0;
+    
+    const salesTotal = dashboardData.rawInvoices
+      .filter(inv => inv.invoice_type === 'Satış')
+      .reduce((sum, inv) => {
+        if (inv.try_equivalent && inv.try_equivalent.total) {
+          return sum + Number(inv.try_equivalent.total);
+        } else if (inv.currency === 'TRY') {
+          return sum + Number(inv.total || 0);
+        }
+        return sum;
+      }, 0);
+    
+    const purchasesTotal = dashboardData.rawInvoices
+      .filter(inv => inv.invoice_type === 'Alış')
+      .reduce((sum, inv) => {
+        if (inv.try_equivalent && inv.try_equivalent.total) {
+          return sum + Number(inv.try_equivalent.total);
+        } else if (inv.currency === 'TRY') {
+          return sum + Number(inv.total || 0);
+        }
+        return sum;
+      }, 0);
+    
+    return salesTotal - purchasesTotal;
+  };
+
+  // Get top companies by total amount
+  const getTopCompanies = (limit = 5) => {
+    if (!dashboardData || !dashboardData.rawInvoices) return [];
+    
+    const companyTotals = {};
+    
+    dashboardData.rawInvoices.forEach(inv => {
+      if (!companyTotals[inv.company]) {
+        companyTotals[inv.company] = 0;
+      }
+      
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        companyTotals[inv.company] += Number(inv.try_equivalent.total);
+      } else if (inv.currency === 'TRY') {
+        companyTotals[inv.company] += Number(inv.total || 0);
+      }
+    });
+    
+    return Object.entries(companyTotals)
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total)
-      .slice(0, 5);
-    const max = sorted[0]?.total || 1;
-    return sorted.map((c) => ({ ...c, pct: Math.round((c.total / max) * 100) }));
-  }, [rawInvoices]);
+      .slice(0, limit);
+  };
 
-  const recentInvoices = useMemo(() =>
-    [...rawInvoices].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5),
-    [rawInvoices]
-  );
-
-  const currencyTotals = useMemo(() => {
-    const map = { TRY: 0, USD: 0, EUR: 0 };
-    rawInvoices.forEach((inv) => {
-      const cur = inv.currency || 'TRY';
-      if (cur === 'TRY') map.TRY += getTryTotal(inv);
-      else if (cur === 'USD') map.USD += getTryTotal(inv);
-      else if (cur === 'EUR') map.EUR += getTryTotal(inv);
+  // Get currency breakdown
+  const getCurrencyBreakdown = () => {
+    if (!dashboardData || !dashboardData.rawInvoices) return [];
+    
+    const currencyStats = {};
+    
+    dashboardData.rawInvoices.forEach(inv => {
+      if (!currencyStats[inv.currency]) {
+        currencyStats[inv.currency] = { count: 0, total: 0 };
+      }
+      
+      currencyStats[inv.currency].count += 1;
+      
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        currencyStats[inv.currency].total += Number(inv.try_equivalent.total);
+      } else if (inv.currency === 'TRY') {
+        currencyStats[inv.currency].total += Number(inv.total || 0);
+      }
     });
-    return map;
-  }, [rawInvoices]);
+    
+    return Object.entries(currencyStats)
+      .map(([currency, stats]) => ({ currency, ...stats }))
+      .sort((a, b) => b.total - a.total);
+  };
 
-  const circ = 2 * Math.PI * 40;
-  const totalCur = currencyTotals.TRY + currencyTotals.USD + currencyTotals.EUR || 1;
-  const tryPct = currencyTotals.TRY / totalCur;
-  const eurPct = currencyTotals.EUR / totalCur;
-  const usdPct = currencyTotals.USD / totalCur;
-  const tryDash = tryPct * circ;
-  const eurDash = eurPct * circ;
-  const usdDash = usdPct * circ;
-  const tryOffset = 0;
-  const eurOffset = -(tryDash);
-  const usdOffset = -(tryDash + eurDash);
+  // Helper to render summary and charts for a given type
+  function renderSummaryAndCharts(type) {
+    const totals = calculateTotalsForDashboard(type);
+    const profitLoss = calculateProfitLoss();
+    const topCompanies = getTopCompanies(5);
+    const currencyBreakdown = getCurrencyBreakdown();
+    
+    return (
+      <>
+        <Row gutter={16}>
+          <Col span={6}>
+            <Card className="dashboard-card kpi-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Toplam KDV' : `${type} KDV`}
+                value={totals.vatAmount}
+                suffix="TL"
+                precision={2}
+                prefix={<PercentageOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="dashboard-card kpi-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Fatura Sayısı' : `${type} Fatura Sayısı`}
+                value={totals.count}
+                prefix={<FileOutlined />}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className="dashboard-card kpi-card">
+              <Statistic
+                title={type === 'Tümü' ? 'Toplam Tutar' : `${type} Toplam Tutar`}
+                value={totals.total}
+                prefix={<DollarOutlined />}
+                suffix="TL"
+                precision={2}
+              />
+            </Card>
+          </Col>
+          <Col span={6}>
+            <Card className={`dashboard-card kpi-card ${profitLoss >= 0 ? 'success' : 'danger'}`}>
+              <Statistic
+                title="Kar/Zarar (Satış - Alış)"
+                value={Math.abs(profitLoss)}
+                prefix={profitLoss >= 0 ? <RiseOutlined /> : <FallOutlined />}
+                suffix="TL"
+                precision={2}
+              />
+            </Card>
+          </Col>
+        </Row>
+        
+        {type === 'Tümü' && (
+          <>
+            <Row gutter={16} style={{ marginTop: 16 }}>
+              <Col span={12}>
+                <Card title={<><TrophyOutlined /> En Yüksek 5 Şirket (Tutara Göre)</>}>
+                  {topCompanies.length > 0 ? (
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {topCompanies.map((company, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          padding: '8px 0', 
+                          borderBottom: index < topCompanies.length - 1 ? '1px solid var(--color-border)' : 'none' 
+                        }}>
+                          <span><strong>{index + 1}.</strong> {company.name}</span>
+                          <span style={{ fontWeight: 'bold', color: 'var(--color-accent)' }}>{company.total.toFixed(2)} TL</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Veri yok</div>
+                  )}
+                </Card>
+              </Col>
+              <Col span={12}>
+                <Card title={<><SwapOutlined /> Para Birimi Dağılımı (Fatura Sayısı)</>}>
+                  {currencyBreakdown.length > 0 ? (
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {currencyBreakdown.map((item, index) => (
+                        <div key={index} style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          padding: '8px 0', 
+                          borderBottom: index < currencyBreakdown.length - 1 ? '1px solid var(--color-border)' : 'none' 
+                        }}>
+                          <span><strong>{item.currency}</strong></span>
+                          <div>
+                            <Tag style={{ color: 'var(--color-accent)', background: 'var(--color-accent-subtle)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 10px', fontSize: 'var(--font-size-xs)' }}>
+                              {item.count} adet
+                            </Tag>
+                            <span style={{ marginLeft: '8px', color: 'var(--color-text-secondary)' }}>{item.total.toFixed(2)} TL</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '20px', color: 'var(--color-text-muted)' }}>Veri yok</div>
+                  )}
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+        
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={24}>
+            <Card title="Aylık KDV" className="chart-container">
+              <div style={{ height: '400px' }}>
+                <Bar data={prepareVatByMonthChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value) {
+                          return value.toLocaleString('tr-TR') + ' TL';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: {
+                        boxWidth: 12,
+                        padding: 15
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+        <Row gutter={16} style={{ marginTop: 16 }}>
+          <Col span={12}>
+            <Card title="Para Birimi Dağılımı" className="chart-container">
+              <div style={{ height: '350px' }}>
+                <Pie data={prepareCurrencyDistributionChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'right',
+                      labels: {
+                        padding: 20
+                      }
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.label}: ${context.raw} adet`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+          <Col span={12}>
+            <Card title="Aylık Toplam" className="chart-container">
+              <div style={{ height: '350px' }}>
+                <Line data={prepareMonthlyTotalsChart(type)} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value) {
+                          return value.toLocaleString('tr-TR') + ' TL';
+                        }
+                      }
+                    }
+                  },
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: function(context) {
+                          return `${context.dataset.label}: ${context.raw.toLocaleString('tr-TR')} TL`;
+                        }
+                      }
+                    }
+                  }
+                }} />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </>
+    );
+  }
 
-  const largestCur = tryPct >= eurPct && tryPct >= usdPct ? { label: 'TRY', pct: tryPct } :
-    eurPct >= usdPct ? { label: 'EUR', pct: eurPct } : { label: 'USD', pct: usdPct };
+  // Calculation logic matching Faturalar page
+  function calculateTotalsForDashboard(type) {
+    if (!dashboardData || !dashboardData.rawInvoices) return { subtotal: 0, vatAmount: 0, total: 0, count: 0 };
+    let filtered = dashboardData.rawInvoices;
+    if (type && type !== 'Tümü') {
+      filtered = filtered.filter(inv => (inv.invoice_type || 'Alış') === type);
+    }
+    let subtotalSum = 0, vatAmountSum = 0, totalSum = 0, count = 0;
+    filtered.forEach(inv => {
+      if (inv.try_equivalent && inv.try_equivalent.total) {
+        subtotalSum += Number(inv.try_equivalent.subtotal) || 0;
+        vatAmountSum += Number(inv.try_equivalent.vat_amount) || 0;
+        totalSum += Number(inv.try_equivalent.total) || 0;
+      } else if (inv.currency === 'TRY') {
+        const subtotal = Number(inv.subtotal) || 0;
+        const vatRate = Number(inv.vat_rate) || 0;
+        const vatAmount = subtotal * (vatRate / 100);
+        subtotalSum += subtotal;
+        vatAmountSum += vatAmount;
+        totalSum += Number(inv.total || 0);
+      }
+      count++;
+    });
+    return {
+      subtotal: subtotalSum,
+      vatAmount: vatAmountSum,
+      total: totalSum,
+      count
+    };
+  }
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '80px 0' }}><Spin size="large" /></div>;
@@ -185,220 +730,49 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="tt-page">
-      <HeroKpi
-        value={currentBucket.vat}
-        prevValue={prevBucket.vat}
-        spark={vatSpark}
-        dueDate={dayjs().date(26)}
-        period={dayjs().format('MMMM YYYY')}
-      />
-
-      <div className="kpi-row">
-        <div className="kpi">
-          <p className="label caps">Toplam Fatura</p>
-          <div className="num">{totalInvoices}</div>
-          <div className="row">
-            <span className={'delta ' + (invoicesDelta >= 0 ? 'up' : 'down')}>
-              {invoicesDelta >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-              {invoicesDelta >= 0 ? '+' : ''}{invoicesDelta} bu ay
-            </span>
-            <svg className="mini-spark" viewBox="0 0 64 22" preserveAspectRatio="none">
-              <polyline
-                points={buildSpark8(buckets, 'vat').map((v, i) => {
-                  const max = Math.max(...buildSpark8(buckets, 'vat')) || 1;
-                  return `${i * 64 / 7},${22 - (v / max) * 18}`;
-                }).join(' ')}
-                fill="none"
-                stroke="var(--chart-1)"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        <div className="kpi">
-          <p className="label caps">Alış Toplamı</p>
-          <div className="num"><span className="cur">₺</span>{purchasesTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <div className="row">
-            <span className={'delta ' + (currentBucket.purchases >= prevBucket.purchases ? 'up' : 'down')}>
-              {currentBucket.purchases >= prevBucket.purchases ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-              bu ay ₺{currentBucket.purchases.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
-            </span>
-            <svg className="mini-spark" viewBox="0 0 64 22" preserveAspectRatio="none">
-              <polyline
-                points={purchaseSpark8.map((v, i) => {
-                  const max = Math.max(...purchaseSpark8) || 1;
-                  return `${i * 64 / 7},${22 - (v / max) * 18}`;
-                }).join(' ')}
-                fill="none"
-                stroke="var(--chart-3)"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        <div className="kpi">
-          <p className="label caps">Satış Toplamı</p>
-          <div className="num"><span className="cur">₺</span>{salesTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-          <div className="row">
-            <span className={'delta ' + (currentBucket.sales >= prevBucket.sales ? 'up' : 'down')}>
-              {currentBucket.sales >= prevBucket.sales ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-              bu ay ₺{currentBucket.sales.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}
-            </span>
-            <svg className="mini-spark" viewBox="0 0 64 22" preserveAspectRatio="none">
-              <polyline
-                points={salesSpark8.map((v, i) => {
-                  const max = Math.max(...salesSpark8) || 1;
-                  return `${i * 64 / 7},${22 - (v / max) * 18}`;
-                }).join(' ')}
-                fill="none"
-                stroke="var(--chart-2)"
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-
-        <div className="kpi">
-          <p className="label caps">Kar / Zarar</p>
-          <div className="num" style={{ color: profitUp ? 'var(--color-success)' : 'var(--color-danger)' }}>
-            <span className="cur">₺</span>{Math.abs(profitLoss).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <div className="row">
-            <span className={'delta ' + (profitUp ? 'up' : 'down')}>
-              {profitUp ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
-              {profitUp ? 'Kâr' : 'Zarar'}
-            </span>
-            <svg className="mini-spark" viewBox="0 0 64 22" preserveAspectRatio="none">
-              <polyline
-                points={profitSpark8.map((v, i) => {
-                  const max = Math.max(...profitSpark8.map(Math.abs)) || 1;
-                  return `${i * 64 / 7},${22 - ((v + max) / (2 * max)) * 18}`;
-                }).join(' ')}
-                fill="none"
-                stroke={profitUp ? 'var(--chart-3)' : 'var(--color-danger)'}
-                strokeWidth="1.6"
-                strokeLinecap="round"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <div className="charts-row">
-        <div className="card chart-card">
-          <div className="chart-head">
-            <h3>KDV — son 12 ay</h3>
-            <div className="legend">
-              <span className="legend-dot">KDV</span>
-            </div>
-          </div>
-          <VatBarChart
-            isDark={isDark}
-            currentIdx={11}
-            labels={buckets.map((b) => b.label)}
-            values={buckets.map((b) => b.vat)}
+    <div>
+      <Row gutter={[16, 16]} align="middle" className="page-header">
+        <Col span={16}>
+          <TitleText level={2}>Dashboard</TitleText>
+        </Col>
+        <Col span={8} style={{ textAlign: 'right' }}>
+          <RangePicker
+            value={dateRange}
+            onChange={handleDateRangeChange}
+            format="DD/MM/YYYY"
+            className="date-range-picker"
+            style={{ marginRight: 8 }}
           />
-        </div>
+          <Button 
+            type="default" 
+            icon={<ReloadOutlined />} 
+            size="small"
+            onClick={resetFiltersToCurrentMonth}
+            title="Filtreleri bu aya sıfırla"
+          />
+        </Col>
+      </Row>
 
-        <div className="card chart-card">
-          <div className="chart-head"><h3>Para Birimi Dağılımı</h3></div>
-          <div className="donut-wrap">
-            <div className="donut">
-              <svg viewBox="0 0 100 100" width="100%" height="100%">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface-sunken)" strokeWidth="12" />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--cc-try)" strokeWidth="12"
-                  strokeDasharray={`${tryDash} ${circ}`}
-                  strokeDashoffset={tryOffset}
-                  strokeLinecap="butt"
-                  transform="rotate(-90 50 50)"
-                />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--cc-eur)" strokeWidth="12"
-                  strokeDasharray={`${eurDash} ${circ}`}
-                  strokeDashoffset={eurOffset}
-                  strokeLinecap="butt"
-                  transform="rotate(-90 50 50)"
-                />
-                <circle cx="50" cy="50" r="40" fill="none" stroke="var(--cc-usd)" strokeWidth="12"
-                  strokeDasharray={`${usdDash} ${circ}`}
-                  strokeDashoffset={usdOffset}
-                  strokeLinecap="butt"
-                  transform="rotate(-90 50 50)"
-                />
-              </svg>
-              <div className="center">
-                <span className="v">{Math.round(largestCur.pct * 100)}%</span>
-                <span className="l">{largestCur.label}</span>
-              </div>
-            </div>
-            <div className="donut-legend">
-              <div className="dl-row">
-                <div className="left">TRY</div>
-                <div className="v">₺{currencyTotals.TRY.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              </div>
-              <div className="dl-row s2">
-                <div className="left">EUR</div>
-                <div className="v">€{currencyTotals.EUR.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              </div>
-              <div className="dl-row s3">
-                <div className="left">USD</div>
-                <div className="v">${currencyTotals.USD.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="companies-row">
-        <div className="card company-list">
-          <div className="chart-head">
-            <h3>En Çok İşlem · Şirketler</h3>
-            <span className="caps">Top 5</span>
-          </div>
-          {topCompanies.map((c) => {
-            const initials = c.name.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase();
-            return (
-              <div className="company-row" key={c.name}>
-                <div className="avatar">{initials}</div>
-                <div className="meta">
-                  <span className="name">{c.name}</span>
-                  <div className="bar"><i style={{ width: `${c.pct}%` }} /></div>
-                </div>
-                <span className="num">₺{c.total.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
-            );
-          })}
-          {topCompanies.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>Veri yok</div>
-          )}
-        </div>
-
-        <div className="card recent-list">
-          <div className="chart-head">
-            <h3>Son Faturalar</h3>
-            <a className="btn-link" onClick={() => navigate('/invoices')} style={{ cursor: 'pointer', fontSize: 12, fontWeight: 500 }}>Tümünü gör →</a>
-          </div>
-          {recentInvoices.map((inv) => (
-            <div className="recent-row" key={inv.id}>
-              <span className={inv.invoice_type === 'Alış' ? 'dot warm' : 'dot'} />
-              <div className="stack">
-                <span className="name">{inv.company}</span>
-                <span className="sub">{inv.invoice_no} · {dayjs(inv.date).format('DD/MM/YYYY')} · {inv.invoice_type}</span>
-              </div>
-              <span className={inv.invoice_type === 'Alış' ? 'chip chip-cool chip-dot' : 'chip chip-warm chip-dot'}>{inv.invoice_type}</span>
-              <span className="amt">{currencySymbol(inv.currency)}{Number(inv.total).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          ))}
-          {recentInvoices.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-tertiary)', fontSize: 13 }}>Fatura bulunamadı</div>
-          )}
-        </div>
-      </div>
+      <Tabs 
+        defaultActiveKey="all" 
+        activeKey={activeType === 'Tümü' ? 'all' : activeType === 'Alış' ? 'buying' : 'selling'}
+        onChange={key => {
+          let newActiveType = 'Tümü';
+          if (key === 'all') newActiveType = 'Tümü';
+          else if (key === 'buying') newActiveType = 'Alış';
+          else if (key === 'selling') newActiveType = 'Satış';
+          
+          setActiveType(newActiveType);
+          saveFiltersToStorage(dateRange, newActiveType);
+        }}
+        items={[
+          { key: 'all',     label: 'Tümü',  children: renderSummaryAndCharts('Tümü') },
+          { key: 'buying',  label: 'Alış',  children: renderSummaryAndCharts('Alış') },
+          { key: 'selling', label: 'Satış', children: renderSummaryAndCharts('Satış') },
+        ]}
+      />
     </div>
   );
-}
+};
+
+export default Dashboard; 

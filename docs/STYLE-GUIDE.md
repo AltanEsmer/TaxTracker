@@ -1,7 +1,5 @@
 # TaxTracker — Style Modernization Guide
 
-> **Status (2026-05-11):** The **"Quiet Premium"** redesign has shipped on branch `redesign/quiet-premium`. The audit and recommendations below describe the *legacy* visual state and are kept for historical context. The current design system is documented at the end of this file under [§13 Quiet Premium (Active)](#13-quiet-premium-active).
-
 > **Goal:** Transform the current Ant Design 5 / React app from a visually dated interface into a clean, modern 2025 financial dashboard — without changing any business logic.
 
 ---
@@ -893,64 +891,3 @@ Work through these in order — each step builds on the previous.
 ---
 
 *Sources: [Uitop Dashboard Trends 2025](https://uitop.design/blog/design/top-dashboard-design-trends/) · [GraphicEagle Fintech UX 2025](https://www.graphiceagle.com/top-ui-ux-trends-in-fintech-products-2025-design-innovations-for-better-finance-apps/) · [FreeCodeCamp Tailwind + Electron](https://www.freecodecamp.org/news/integrate-tailwind-with-electron/) · [Inter Font](https://rsms.me/inter/) · [Ant Design 5 Theme](https://ant.design/docs/react/customize-theme)*
-
----
-
-## 13. Quiet Premium (Active)
-
-The "Quiet Premium" redesign (delivered via Claude Design handoff `am004PagWNh2spXUG0wjzg`) is the current visual system as of `redesign/quiet-premium`. It supersedes most recommendations in §1–§12.
-
-### Identity
-
-- **Primary** — Cobalt Ink `#1f3fe5` (denser & more violet-leaning than the old Tailwind blue). Full ramp at `--color-primary-50..950`.
-- **Neutrals** — cool slate (warmer than pure greys). Ramp at `--color-neutral-50..950`.
-- **Semantic** — muted fintech hues, never AntD defaults: success `#2f7d5b`, danger `#c0394a`, warning `#b07a1a`.
-- **Currency accents** (used sparingly for chips, chart series, foreign-currency cell numerics): TRY `--cc-try`, USD `--cc-usd`, EUR `--cc-eur`.
-- **Hero gradient** (`--hero-gradient`) — used **once**, on the Dashboard's monthly-VAT KPI card. Never repeated.
-
-### Typography
-
-- Body / UI — **Inter Tight** (400/500/600/700)
-- Tabular numerics — **JetBrains Mono** (`var(--font-mono)`, applied via `.mono` / `.num` utility classes)
-- Both fonts loaded via Google Fonts `@import` at the top of `src/index.css`
-
-### Token system
-
-All design tokens live as CSS custom properties in `src/index.css` (lines ~1–270), keyed to `[data-theme="light"]` and `[data-theme="dark"]`. AntD ConfigProvider in `src/theme.js` mirrors these values so AntD components (Table, Card, Button, Input, Segmented, etc.) match the rest of the page.
-
-Theme toggle is in the sidebar footer (`src/App.js`) and persists to `localStorage['taxtracker-theme']`.
-
-### Component patterns
-
-- **Sidebar** — `.tt-sidebar` + `.tt-lockup` + `.nav-item` (left accent bar via `::before` on active state, NOT a full pill)
-- **Topbar** — breadcrumbs + page title (driven by `useLocation()` in `App.js`); pages inject right-slot content via `TopBarContext.Provider` + `useContext(TopBarContext).setRight(...)`
-- **Cards** — `.card` + `.card-pad` (or specialised `.form-card`, `.fx-card`, `.chart-card`, `.kpi`, `.company-list`, `.recent-list`)
-- **Chips** — `.chip` + `.chip-cool`/`.chip-warm`/`.chip-success`/`.chip-danger`/`.chip-neutral` (plus `.chip-dot` for the leading bullet)
-- **Segmented** — `.seg` (track) or `.seg-pill` (pill variant); AntD's `<Segmented>` is themed to match
-- **Tables** — `.ti` table base; columns use `.num` for right-aligned mono numerics, `.dual` for dual-currency cells, `.table-footer` for the sticky filtered-totals bar
-- **Money input** — `.money-prefix-wrap[data-prefix="$"]` wraps an InputNumber rendered as `.money-amount` (56px, 24px JetBrains Mono)
-- **VAT chips** — `.vat-chips button` with `.active`; static set `%0/%5/%10/%16/%20`
-- **FX reveal** — `.fx-reveal` (banner inside `.money-zone` when currency != TRY)
-
-### File map
-
-| File | Purpose |
-|---|---|
-| `src/index.css` | Token system + utility classes (~1400 lines) |
-| `src/theme.js` | AntD ConfigProvider — `lightTheme`, `darkTheme`, `getTheme(mode)` |
-| `src/App.js` | Shell: sidebar, topbar with `TopBarContext`, theme toggle |
-| `src/components/DashboardHero.jsx` | `HeroKpi` (gradient KPI + count-up + sparkline + due-date) + `VatBarChart` |
-| `src/components/InvoiceTable.jsx` | Premium AntD `<Table>` + dual-currency cell + sticky summary footer + empty state |
-| `src/components/InvoiceFormMoneyZone.jsx` | Currency segmented + VAT chips + total display + FX reveal banner |
-| `src/pages/Dashboard.js` | Hero KPI + 4-col KPI row + bar chart + currency donut + top companies + recent invoices |
-| `src/pages/InvoiceList.js` | Toolbar (search + segmented filters) + premium table + sticky footer |
-| `src/pages/InvoiceForm.js` | 2-col `form-grid`: metadata card + money zone + footer bar |
-| `src/pages/FxRates.js` | 2-col `fx-grid`: USD/EUR averaging form + 12-month history table |
-
-### Constraints preserved
-
-- All Turkish copy unchanged (`Faturalar`, `Yeni Fatura`, `Kur Yönetimi`, `Alış`, `Satış`)
-- All `window.api.*` IPC calls unchanged — pure renderer work
-- Invoice & FxRate data shapes unchanged
-- HashRouter retained (required for production `file://` loads)
-- localStorage key `taxtracker-theme` retained for backward compat (design's example used `tt-theme` — not adopted)
